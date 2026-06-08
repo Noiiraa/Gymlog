@@ -96,6 +96,26 @@
   <p style="font-size:11px;color:#334155;">Estas credenciales se guardan solo en este dispositivo</p>
 </div>
 
+ <!-- LOGIN SCREEN -->
+<div class="config-screen" id="login-screen" style="display:none">
+  <div style="font-size:40px">🔐</div>
+  <h2>Entrar en GymLog</h2>
+  <p>Inicia sesión con tu usuario autorizado.</p>
+
+  <div class="config-group">
+    <div class="config-label">Email</div>
+    <input class="input" id="login-email" type="email" placeholder="tu@email.com" autocomplete="email"/>
+  </div>
+
+  <div class="config-group">
+    <div class="config-label">Contraseña</div>
+    <input class="input" id="login-password" type="password" placeholder="••••••••" autocomplete="current-password"/>
+  </div>
+
+  <button class="btn-primary" onclick="login()">Entrar →</button>
+  <button class="export-btn" onclick="resetCredentials()">Cambiar credenciales Supabase</button>
+</div>
+
 <!-- MAIN APP -->
 <div id="app" style="display:none">
   <div class="header">
@@ -213,8 +233,8 @@
     <div class="card">
       <div class="card-title">🔌 Conexión</div>
       <div style="font-size:12px;color:#64748b;margin-bottom:10px;" id="conn-info"></div>
+      <button class="export-btn" onclick="logout()" style="margin-bottom:8px;">🚪 Cerrar sesión</button>
       <button class="export-btn" onclick="resetCredentials()" style="margin-bottom:8px;">🔄 Cambiar credenciales Supabase</button>
-      <button class="danger-btn" onclick="clearAllData()">🗑️ Borrar todos los datos</button>
     </div>
   </div>
 </div>
@@ -316,16 +336,83 @@ function loadCredentials() {
   } catch { return null; }
 }
 
-function initSupabase(url, key) {
+async function initSupabase(url, key) {
   try {
     sbClient = window.supabase.createClient(url, key);
+
     document.getElementById('config-screen').style.display = 'none';
-    document.getElementById('app').style.display = 'block';
-    loadConfig();
-    loadSessions();
-    document.getElementById('conn-info').textContent = `Conectado a: ${url}`;
+    document.getElementById('app').style.display = 'none';
+    document.getElementById('login-screen').style.display = 'none';
+
+    const { data, error } = await sbClient.auth.getSession();
+    if (error) throw error;
+
+    if (data.session) {
+      await startApp(url);
+    } else {
+      document.getElementById('login-screen').style.display = 'flex';
+    }
+
+    sbClient.auth.onAuthStateChange((_event, session) => {
+      if (session) {
+        startApp(url);
+      } else {
+        document.getElementById('app').style.display = 'none';
+        document.getElementById('login-screen').style.display = 'flex';
+      }
+    });
+
   } catch(e) {
-    alert('Error de conexión: ' + e.message); console.error(e);
+    alert('Error de conexión: ' + e.message);
+    console.error(e);
+  }
+}
+
+ async function startApp(url) {
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+
+  loadConfig();
+  await loadSessions();
+
+  const conn = document.getElementById('conn-info');
+  if (conn) conn.textContent = `Conectado a: ${url}`;
+}
+
+async function login() {
+  const email = document.getElementById('login-email').value.trim();
+  const password = document.getElementById('login-password').value;
+
+  if (!email || !password) {
+    alert('Introduce email y contraseña');
+    return;
+  }
+
+  try {
+    const { error } = await sbClient.auth.signInWithPassword({
+      email,
+      password
+    });
+
+    if (error) throw error;
+
+    document.getElementById('login-password').value = '';
+    showToast('Sesión iniciada');
+  } catch (e) {
+    alert('No se pudo iniciar sesión: ' + e.message);
+    console.error(e);
+  }
+}
+
+async function logout() {
+  try {
+    const { error } = await sbClient.auth.signOut();
+    if (error) throw error;
+    sessions = [];
+    sessionEntries = [];
+    showToast('Sesión cerrada');
+  } catch (e) {
+    alert('Error cerrando sesión: ' + e.message);
   }
 }
 
@@ -352,11 +439,8 @@ async function loadSessions() {
     if (error) throw error;
     sessions = data || [];
     // Import historical if DB is empty
-    if (sessions.length === 0 && !historicalImported) {
-      historicalImported = true;
-      await importHistorical();
-      return;
-    }
+    // Import histórico desactivado en producción.
+    // Si necesitas importar datos antiguos, hazlo una sola vez desde Supabase SQL o desde un script controlado.
     setSyncing('ok');
     updateHeaderStats();
   } catch(e) {
@@ -409,6 +493,15 @@ function updateHeaderStats() {
   document.getElementById('header-stats').textContent = `${days} sesiones · ${sessions.length} entradas`;
 }
 
+function esc(value) {
+  return String(value ?? '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#039;');
+}
+
 // ─── TABS ───
 function showTab(t) {
   document.querySelectorAll('.tab').forEach((b,i) => {
@@ -431,7 +524,7 @@ function initRegistro() {
 function renderPersonaBtns() {
   document.getElementById('persona-btns').innerHTML = config.personas.map(p => {
     const c = personaColor(p), sel = selectedPersona===p;
-    return `<button class="persona-btn" onclick="selectPersona('${p}')"
+    return `<button class="persona-btn" onclick='selectPersona(${JSON.stringify(p)})'
       style="border-color:${sel?c:'#2d2d4e'};background:${sel?c+'22':'#1a1a2e'};color:${sel?c:'#94a3b8'}">${p}</button>`;
   }).join('');
 }
@@ -441,7 +534,7 @@ function selectPersona(p) { selectedPersona=p; renderPersonaBtns(); updateSaveBt
 function renderGrupoBtns() {
   document.getElementById('grupo-btns').innerHTML = Object.keys(config.ejercicios).map(g => {
     const c=groupColor(g), sel=selectedGrupo===g;
-    return `<button class="btn-pill" onclick="selectGrupo('${g}')"
+    return `<button class="btn-pill" onclick='selectGrupo(${JSON.stringify(g)})'
       style="border-color:${sel?c:'#2d2d4e'};background:${sel?c+'22':'#1a1a2e'};color:${sel?c:'#94a3b8'}">${g}</button>`;
   }).join('');
 }
@@ -517,8 +610,8 @@ function renderSessionEntries() {
   document.getElementById('session-count').textContent=`Esta sesión (${sessionEntries.length})`;
   document.getElementById('session-list').innerHTML = sessionEntries.map(e =>
     `<div class="entry-card" style="border-left-color:${groupColor(e.grupo)}">
-      <div><div class="entry-title">${e.ejercicio}</div>
-      <div class="entry-sub">${e.persona} · ${e.series}×${e.reps} · ${e.peso}kg</div></div>
+      <div><div class="entry-title">${esc(e.ejercicio)}</div>
+      <div class="entry-sub">${esc(e.persona)} · ${esc(e.series)}×${esc(e.reps)} · ${esc(e.peso)}kg</div></div>
     </div>`).join('');
 }
 
@@ -531,8 +624,8 @@ function renderHistorial() {
     const pc=personaColor(s.persona);
     return `<div class="entry-card" style="border-left-color:${groupColor(s.grupo)}">
       <div>
-        <div class="entry-title">${s.ejercicio||'—'}</div>
-        <div class="entry-sub">${s.fecha} · <span style="color:${pc}">${s.persona}</span> · ${s.series}×${s.reps} · ${s.peso}kg</div>
+        <div class="entry-title">${esc(s.ejercicio || '—')}</div>
+        <div class="entry-sub">${esc(s.fecha)} · <span style="color:${pc}">${esc(s.persona)}</span> · ${esc(s.series)}×${esc(s.reps)} · ${esc(s.peso)}kg</div>
       </div>
       <button class="del-btn" onclick="deleteEntry(${s.id})">×</button>
     </div>`;
@@ -563,7 +656,7 @@ function renderVolumen() {
   const max=sorted[0]?.[1]||1;
   document.getElementById('volumen-bars').innerHTML = sorted.map(([g,c])=>
     `<div class="bar-row">
-      <div class="bar-labels"><span>${g}</span><span style="color:#64748b">${c}</span></div>
+      <div class="bar-labels"><span>${esc(g)}</span><span style="color:#64748b">${esc(c)}</span></div>
       <div class="bar-track"><div class="bar-fill" style="width:${(c/max)*100}%;background:${groupColor(g)}"></div></div>
     </div>`).join('');
 }
@@ -571,7 +664,7 @@ function renderVolumen() {
 function renderChartPersonaBtns() {
   document.getElementById('chart-persona-btns').innerHTML = config.personas.map(p => {
     const c=personaColor(p), sel=chartPersona===p;
-    return `<button class="btn-pill" onclick="selectChartPersona('${p}')"
+    return `<button class="btn-pill" onclick='selectChartPersona(${JSON.stringify(p)})'
       style="border-color:${sel?c:'#2d2d4e'};background:${sel?c+'22':'#1a1a2e'};color:${sel?c:'#64748b'};font-weight:${sel?700:400}">${p}</button>`;
   }).join('');
 }
@@ -581,7 +674,9 @@ function selectChartPersona(p) { chartPersona=p; renderChartPersonaBtns(); rende
 function renderChartEjercicioSelect() {
   const all=[...new Set(sessions.map(s=>s.ejercicio).filter(Boolean))].sort();
   const sel=document.getElementById('chart-ejercicio'), cur=sel.value;
-  sel.innerHTML=all.map(e=>`<option value="${e}"${e===cur?' selected':''}>${e}</option>`).join('');
+  sel.innerHTML = all.map(e =>
+   `<option value="${esc(e)}"${e===cur?' selected':''}>${esc(e)}</option>`
+ ).join('');
 }
 
 function renderChart() {
@@ -641,8 +736,8 @@ function renderPersonasChips() {
   document.getElementById('personas-chips').innerHTML = config.personas.map(p=>{
     const c=personaColor(p);
     return `<span class="chip" style="border:1px solid ${c}44">
-      <span style="color:${c};font-weight:700">${p}</span>
-      <button class="chip-del" onclick="removePersona('${p}')">×</button></span>`;
+      <span style="color:${c};font-weight:700">${esc(p)}</span>
+      <button class="chip-del" onclick='removePersona(${JSON.stringify(p)})'>×</button></span>`;
   }).join('');
 }
 function addPersona() {
@@ -678,8 +773,8 @@ function renderSelGrupoEj() {
 function renderEjerciciosAdmin() {
   const g=document.getElementById('sel-grupo-ej').value, list=config.ejercicios[g]||[];
   document.getElementById('ejercicios-admin-chips').innerHTML = list.map(e=>
-    `<span class="chip"><span style="color:#94a3b8">${e}</span>
-     <button class="chip-del" onclick="removeEjercicio('${g}','${e.replace(/'/g,"\\'")}')">×</button></span>`
+    `<span style="color:#94a3b8">${esc(e)}</span>
+     <button class="chip-del" onclick='removeEjercicio(${JSON.stringify(g)},'${e.replace(/'/g,"\\'")}')'>×</button></span>`
   ).join('')||'<span style="color:#475569;font-size:12px">Sin ejercicios</span>';
 }
 function addEjercicio() {
@@ -690,16 +785,6 @@ function addEjercicio() {
 }
 function removeEjercicio(g,e) {
   config.ejercicios[g]=config.ejercicios[g].filter(x=>x!==e); saveConfigLocal(); renderEjerciciosAdmin();
-}
-
-async function clearAllData() {
-  if(!confirm('¿Borrar TODOS los datos de Supabase? No se puede deshacer.')) return;
-  try {
-    const { error } = await sbClient.from('sesiones').delete().neq('id',0);
-    if(error) throw error;
-    sessions=[]; updateHeaderStats(); renderHistorial();
-    showToast('Datos borrados'); setSyncing('ok');
-  } catch(e) { showToast('Error borrando datos'); }
 }
 
 // ─── BOOT ───
