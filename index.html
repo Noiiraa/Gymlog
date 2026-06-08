@@ -79,24 +79,7 @@
 </head>
 <body>
 
-<!-- CONFIG SCREEN (shown if no credentials) -->
-<div class="config-screen" id="config-screen">
-  <div style="font-size:40px">💪</div>
-  <h2>GymLog</h2>
-  <p>Introduce las credenciales de tu proyecto Supabase.<br/>Solo hay que hacerlo una vez en cada dispositivo.</p>
-  <div class="config-group">
-    <div class="config-label">URL del proyecto</div>
-    <input class="input" id="cfg-url" placeholder="https://xxxxxxxxxxxx.supabase.co"/>
-  </div>
-  <div class="config-group">
-    <div class="config-label">Clave anon/public</div>
-    <input class="input" id="cfg-key" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."/>
-  </div>
-  <button class="btn-primary" onclick="saveCredentials()">Conectar →</button>
-  <p style="font-size:11px;color:#334155;">Estas credenciales se guardan solo en este dispositivo</p>
-</div>
-
- <!-- LOGIN SCREEN -->
+<!-- LOGIN SCREEN -->
 <div class="config-screen" id="login-screen" style="display:none">
   <div style="font-size:40px">🔐</div>
   <h2>Entrar en GymLog</h2>
@@ -113,7 +96,6 @@
   </div>
 
   <button class="btn-primary" onclick="login()">Entrar →</button>
-  <button class="export-btn" onclick="resetCredentials()">Cambiar credenciales Supabase</button>
 </div>
 
 <!-- MAIN APP -->
@@ -230,12 +212,11 @@
         <button class="btn-add" onclick="addEjercicio()">+ Añadir</button>
       </div>
     </div>
-    <div class="card">
-      <div class="card-title">🔌 Conexión</div>
-      <div style="font-size:12px;color:#64748b;margin-bottom:10px;" id="conn-info"></div>
-      <button class="export-btn" onclick="logout()" style="margin-bottom:8px;">🚪 Cerrar sesión</button>
-      <button class="export-btn" onclick="resetCredentials()" style="margin-bottom:8px;">🔄 Cambiar credenciales Supabase</button>
-    </div>
+     <div class="card">
+       <div class="card-title">🔌 Conexión</div>
+       <div style="font-size:12px;color:#64748b;margin-bottom:10px;" id="conn-info"></div>
+       <button class="export-btn" onclick="logout()" style="margin-bottom:8px;">🚪 Cerrar sesión</button>
+     </div>
   </div>
 </div>
 
@@ -243,7 +224,9 @@
 
 <script>
 // ─── SUPABASE CREDENTIALS ───
-const CRED_KEY = "gymlog_creds_v1";
+const SUPABASE_URL = "https://ialngggvnlrzxdxczicu.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlhbG5nZ2d2bmxyenhkeGN6aWN1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA4NTM1NTcsImV4cCI6MjA5NjQyOTU1N30.O2NvquZjKDMPUnzmJORYyEwtVYxomWR9KFSwjpPLpO0";
+
 const CONFIG_KEY = "gymlog_config_v2";
 
 const GROUP_COLORS = {
@@ -311,72 +294,54 @@ let sessionEntries = [], chartPersona = "", myChart = null;
 let historicalImported = false;
 
 // ─── CREDENTIALS ───
-function saveCredentials() {
-  const url = document.getElementById('cfg-url').value.trim();
-  const key = document.getElementById('cfg-key').value.trim();
-  if (!url || !key) { alert('Rellena los dos campos'); return; }
-  const cleanUrl = url.replace(/\/$/, '').replace(/\/rest\/v1$/, '');
-  localStorage.setItem(CRED_KEY, JSON.stringify({url: cleanUrl, key}));
-  initSupabase(cleanUrl, key);
-}
-
-function initSupabaseError(msg) {
-  alert(msg);
-}
-
-function resetCredentials() {
-  localStorage.removeItem(CRED_KEY);
-  location.reload();
-}
-
-function loadCredentials() {
+async function initSupabase() {
   try {
-    const r = localStorage.getItem(CRED_KEY);
-    return r ? JSON.parse(r) : null;
-  } catch { return null; }
-}
+    sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-async function initSupabase(url, key) {
-  try {
-    sbClient = window.supabase.createClient(url, key);
+    const loginScreen = document.getElementById('login-screen');
+    const app = document.getElementById('app');
 
-    document.getElementById('config-screen').style.display = 'none';
-    document.getElementById('app').style.display = 'none';
-    document.getElementById('login-screen').style.display = 'none';
+    if (loginScreen) loginScreen.style.display = 'none';
+    if (app) app.style.display = 'none';
 
     const { data, error } = await sbClient.auth.getSession();
     if (error) throw error;
 
     if (data.session) {
-      await startApp(url);
+      await startApp();
     } else {
-      document.getElementById('login-screen').style.display = 'flex';
+      loginScreen.style.display = 'flex';
     }
 
     sbClient.auth.onAuthStateChange((_event, session) => {
       if (session) {
-        startApp(url);
+        startApp();
       } else {
-        document.getElementById('app').style.display = 'none';
-        document.getElementById('login-screen').style.display = 'flex';
+        sessions = [];
+        sessionEntries = [];
+        app.style.display = 'none';
+        loginScreen.style.display = 'flex';
       }
     });
 
   } catch(e) {
-    alert('Error de conexión: ' + e.message);
+    alert('Error inicializando Supabase: ' + e.message);
     console.error(e);
   }
 }
 
- async function startApp(url) {
+async function startApp() {
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('app').style.display = 'block';
 
   loadConfig();
   await loadSessions();
 
+  const { data } = await sbClient.auth.getUser();
+  const email = data?.user?.email || 'usuario';
+
   const conn = document.getElementById('conn-info');
-  if (conn) conn.textContent = `Conectado a: ${url}`;
+  if (conn) conn.textContent = `Sesión iniciada como: ${email}`;
 }
 
 async function login() {
@@ -408,11 +373,13 @@ async function logout() {
   try {
     const { error } = await sbClient.auth.signOut();
     if (error) throw error;
+
     sessions = [];
     sessionEntries = [];
     showToast('Sesión cerrada');
   } catch (e) {
     alert('Error cerrando sesión: ' + e.message);
+    console.error(e);
   }
 }
 
@@ -788,10 +755,8 @@ function removeEjercicio(g,e) {
 }
 
 // ─── BOOT ───
-const creds = loadCredentials();
-if (creds) {
-  initSupabase(creds.url, creds.key);
-}
+initSupabase();
+ 
 </script>
 </body>
 </html>
