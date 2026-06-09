@@ -379,53 +379,6 @@
   }
   .toast.show{opacity:1;}
 
-  .history-summary{
-    display:flex;
-    align-items:center;
-    justify-content:space-between;
-    gap:10px;
-    margin-bottom:12px;
-    padding:10px 12px;
-    border:1px solid var(--border);
-    border-radius:16px;
-    background:rgba(39,21,61,.42);
-    color:var(--muted-2);
-    font-size:12px;
-    backdrop-filter:blur(14px);
-  }
-
-  .history-pager{
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    gap:8px;
-    margin:14px 0 2px;
-  }
-
-  .pager-btn{
-    min-width:42px;
-    padding:10px 12px;
-    border-radius:14px;
-    border:1px solid var(--border);
-    background:rgba(255,233,237,.10);
-    color:var(--lavender-blush);
-    font-weight:850;
-    backdrop-filter:blur(12px);
-  }
-
-  .pager-btn:disabled{
-    opacity:.35;
-    cursor:not-allowed;
-  }
-
-  .pager-text{
-    min-width:96px;
-    text-align:center;
-    color:var(--muted-2);
-    font-size:12px;
-    font-weight:750;
-  }
-
   .config-screen{
     position:fixed;
     inset:0;
@@ -563,9 +516,10 @@
       <div id="volumen-bars"></div>
     </div>
     <div class="card">
-      <div class="card-title">Evolución de peso</div>
+      <div class="card-title" id="chart-title">Evolución de peso por máquina</div>
       <div class="btn-row" id="chart-persona-btns" style="margin-bottom:10px;"></div>
-      <select id="chart-ejercicio" class="input" style="margin-bottom:12px;" onchange="renderChart()"></select>
+      <div class="btn-row" id="chart-mode-btns" style="margin-bottom:10px;"></div>
+      <select id="chart-target" class="input" style="margin-bottom:12px;" onchange="renderChart()"></select>
       <div id="chart-container">
         <div class="chart-wrap"><canvas id="myChart" height="200"></canvas></div>
         <div class="chart-stat" id="chart-stat"></div>
@@ -680,10 +634,8 @@ let sbClient = null;
 let sessions = [];
 let config = {};
 let selectedPersona = "", selectedGrupo = "", selectedEjercicio = "";
-let sessionEntries = [], chartPersona = "", myChart = null;
+let sessionEntries = [], chartPersona = "", chartMode = "ejercicio", myChart = null;
 let historicalImported = false;
-const HISTORIAL_PAGE_SIZE = 25;
-let historialPage = 1;
 
 // ─── CREDENTIALS ───
 async function initSupabase() {
@@ -977,53 +929,18 @@ function renderSessionEntries() {
 // ─── HISTORIAL ───
 function renderHistorial() {
   const el = document.getElementById('historial-list');
-  const list = [...sessions].sort((a,b) => {
-    const byDate = String(b.fecha || '').localeCompare(String(a.fecha || ''));
-    if (byDate !== 0) return byDate;
-    return Number(b.id || 0) - Number(a.id || 0);
-  });
-
-  if (!list.length) {
-    el.innerHTML = '<div class="no-data">Sin entradas todavía</div>';
-    return;
-  }
-
-  const totalPages = Math.max(1, Math.ceil(list.length / HISTORIAL_PAGE_SIZE));
-  historialPage = Math.min(Math.max(historialPage, 1), totalPages);
-
-  const start = (historialPage - 1) * HISTORIAL_PAGE_SIZE;
-  const end = start + HISTORIAL_PAGE_SIZE;
-  const pageItems = list.slice(start, end);
-
-  const summary = `<div class="history-summary">
-    <span>${esc(list.length)} entradas</span>
-    <span>Mostrando ${esc(start + 1)}-${esc(Math.min(end, list.length))}</span>
-  </div>`;
-
-  const cards = pageItems.map(s => {
-    const pc = personaColor(s.persona);
+  const list = [...sessions].reverse().slice(0,100);
+  if (!list.length) { el.innerHTML='<div class="no-data">Sin entradas todavía</div>'; return; }
+  el.innerHTML = list.map(s => {
+    const pc=personaColor(s.persona);
     return `<div class="entry-card" style="border-left-color:${groupColor(s.grupo)}">
       <div>
         <div class="entry-title">${esc(s.ejercicio || '—')}</div>
         <div class="entry-sub">${esc(s.fecha)} · <span style="color:${pc}">${esc(s.persona)}</span> · ${esc(s.series)}×${esc(s.reps)} · ${esc(s.peso)}kg</div>
       </div>
-      <button class="del-btn" onclick="deleteEntry(${Number(s.id)})">×</button>
+      <button class="del-btn" onclick="deleteEntry(${s.id})">×</button>
     </div>`;
   }).join('');
-
-  const pager = totalPages > 1 ? `<div class="history-pager">
-    <button class="pager-btn" onclick="setHistorialPage(${historialPage - 1})" ${historialPage <= 1 ? 'disabled' : ''}>‹</button>
-    <div class="pager-text">Página ${esc(historialPage)} / ${esc(totalPages)}</div>
-    <button class="pager-btn" onclick="setHistorialPage(${historialPage + 1})" ${historialPage >= totalPages ? 'disabled' : ''}>›</button>
-  </div>` : '';
-
-  el.innerHTML = summary + cards + pager;
-}
-
-function setHistorialPage(page) {
-  historialPage = page;
-  renderHistorial();
-  window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
 async function deleteEntry(id) {
@@ -1039,7 +956,8 @@ async function deleteEntry(id) {
 function renderProgreso() {
   renderVolumen();
   renderChartPersonaBtns();
-  renderChartEjercicioSelect();
+  renderChartModeBtns();
+  renderChartTargetSelect();
   renderChart();
 }
 
@@ -1065,59 +983,111 @@ function renderChartPersonaBtns() {
 
 function selectChartPersona(p) { chartPersona=p; renderChartPersonaBtns(); renderChart(); }
 
-function renderChartEjercicioSelect() {
-  const all=[...new Set(sessions.map(s=>s.ejercicio).filter(Boolean))].sort();
-  const sel=document.getElementById('chart-ejercicio'), cur=sel.value;
-  sel.innerHTML = all.map(e =>
-   `<option value="${esc(e)}"${e===cur?' selected':''}>${esc(e)}</option>`
- ).join('');
+function renderChartModeBtns() {
+  const modes = [
+    {id:'ejercicio', label:'Máquinas'},
+    {id:'grupo', label:'Grupos musculares'}
+  ];
+  document.getElementById('chart-mode-btns').innerHTML = modes.map(m => {
+    const sel = chartMode === m.id;
+    return `<button class="btn-pill" onclick='selectChartMode(${JSON.stringify(m.id)})'
+      style="border-color:${sel?'#F6B6B7':'rgba(255,233,237,.18)'};background:${sel?'rgba(246,182,183,.22)':'rgba(39,21,61,.58)'};color:${sel?'#FFE9ED':'rgba(255,233,237,.62)'};font-weight:${sel?800:500}">${esc(m.label)}</button>`;
+  }).join('');
+}
+
+function selectChartMode(mode) {
+  chartMode = mode;
+  renderChartModeBtns();
+  renderChartTargetSelect();
+  renderChart();
+}
+
+function renderChartTargetSelect() {
+  const sel = document.getElementById('chart-target');
+  const cur = sel.value;
+  const all = chartMode === 'grupo'
+    ? [...new Set(sessions.map(s=>s.grupo).filter(Boolean))].sort()
+    : [...new Set(sessions.map(s=>s.ejercicio).filter(Boolean))].sort();
+
+  document.getElementById('chart-title').textContent = chartMode === 'grupo'
+    ? 'Evolución de volumen por grupo muscular'
+    : 'Evolución de peso por máquina';
+
+  sel.innerHTML = all.map(v =>
+    `<option value="${esc(v)}"${v===cur?' selected':''}>${esc(v)}</option>`
+  ).join('');
+
+  if (all.length && !all.includes(sel.value)) sel.value = all[0];
+}
+
+function getChartData(target) {
+  const filtered = sessions.filter(s =>
+    s.persona === chartPersona &&
+    (chartMode === 'grupo' ? s.grupo === target : s.ejercicio === target)
+  );
+
+  if (chartMode === 'grupo') {
+    return filtered.reduce((acc,s)=>{
+      const volumen = Number(s.series || 0) * Number(s.reps || 0) * Number(s.peso || 0);
+      const ex = acc.find(a=>a.fecha===s.fecha);
+      if (ex) ex.valor += volumen; else acc.push({fecha:s.fecha, valor:volumen});
+      return acc;
+    },[]).sort((a,b)=>a.fecha.localeCompare(b.fecha));
+  }
+
+  return filtered.reduce((acc,s)=>{
+    const ex=acc.find(a=>a.fecha===s.fecha);
+    const peso = Number(s.peso || 0);
+    if(ex) ex.valor=Math.max(ex.valor,peso); else acc.push({fecha:s.fecha,valor:peso});
+    return acc;
+  },[]).sort((a,b)=>a.fecha.localeCompare(b.fecha));
 }
 
 function renderChart() {
-  const ejercicio=document.getElementById('chart-ejercicio').value;
-  const data=sessions
-    .filter(s=>s.persona===chartPersona&&s.ejercicio===ejercicio)
-    .reduce((acc,s)=>{
-      const ex=acc.find(a=>a.fecha===s.fecha);
-      if(ex) ex.peso=Math.max(ex.peso,s.peso); else acc.push({fecha:s.fecha,peso:s.peso});
-      return acc;
-    },[]).sort((a,b)=>a.fecha.localeCompare(b.fecha));
+  const target = document.getElementById('chart-target').value;
+  const data = getChartData(target);
 
   const cont=document.getElementById('chart-container'), emp=document.getElementById('chart-empty');
+  emp.textContent = chartMode === 'grupo'
+    ? 'Necesitas al menos 2 días con este grupo muscular'
+    : 'Necesitas al menos 2 sesiones con este ejercicio';
   if(data.length<2){ cont.style.display='none'; emp.style.display='block'; return; }
   cont.style.display='block'; emp.style.display='none';
 
   const color=personaColor(chartPersona);
+  const unit = chartMode === 'grupo' ? ' kg de volumen' : ' kg';
+  const label = chartMode === 'grupo' ? `Volumen · ${target}` : target;
+
   if(myChart) myChart.destroy();
   myChart=new Chart(document.getElementById('myChart').getContext('2d'),{
     type:'line',
     data:{labels:data.map(d=>d.fecha.slice(5)),datasets:[{
-      label:ejercicio, data:data.map(d=>d.peso),
+      label, data:data.map(d=>Number(d.valor.toFixed(1))),
       borderColor:color, backgroundColor:color+'22',
       pointBackgroundColor:color, pointRadius:5, pointHoverRadius:7,
       borderWidth:2.5, fill:true, tension:0.3
     }]},
     options:{
       responsive:true, maintainAspectRatio:false,
-      plugins:{legend:{display:false},tooltip:{backgroundColor:'#27153D',borderColor:'#F6B6B7',borderWidth:1,callbacks:{label:c=>`${c.parsed.y} kg`}}},
+      plugins:{legend:{display:false},tooltip:{backgroundColor:'#27153D',borderColor:'#F6B6B7',borderWidth:1,callbacks:{label:c=>`${c.parsed.y}${unit}`}}},
       scales:{
         x:{ticks:{color:'#FFE9ED',font:{size:10}},grid:{color:'rgba(255,233,237,.12)'}},
-        y:{ticks:{color:'#FFE9ED',font:{size:10},callback:v=>v+'kg'},grid:{color:'rgba(255,233,237,.12)'}}
+        y:{ticks:{color:'#FFE9ED',font:{size:10},callback:v=>v+unit},grid:{color:'rgba(255,233,237,.12)'}}
       }
     }
   });
 
-  const diff=data.at(-1).peso-data[0].peso, pct=((diff/data[0].peso)*100).toFixed(1);
+  const diff=data.at(-1).valor-data[0].valor, pct=data[0].valor ? ((diff/data[0].valor)*100).toFixed(1) : '0.0';
   const statEl=document.getElementById('chart-stat');
   statEl.style.color=diff>=0?'#A6C9B6':'#F6B6B7';
-  statEl.textContent=`${diff>=0?'↑':'↓'} ${Math.abs(diff).toFixed(1)} kg (${diff>=0?'+':''}${pct}%) desde inicio`;
+  statEl.textContent=`${diff>=0?'↑':'↓'} ${Math.abs(diff).toFixed(1)}${unit} (${diff>=0?'+':''}${pct}%) desde inicio`;
 }
 
 function exportChart() {
   if(!myChart) return;
-  const ejercicio=document.getElementById('chart-ejercicio').value;
+  const target=document.getElementById('chart-target').value;
   const a=document.createElement('a');
-  a.download=`gymlog_${chartPersona}_${ejercicio.replace(/\s+/g,'_')}.png`;
+  a.download=`gymlog_${chartMode}_${chartPersona}_${target.replace(/\s+/g,'_')}.png`;
   a.href=myChart.toBase64Image('image/png',1); a.click();
 }
 
