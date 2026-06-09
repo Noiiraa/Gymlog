@@ -379,6 +379,53 @@
   }
   .toast.show{opacity:1;}
 
+  .history-summary{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
+    margin-bottom:12px;
+    padding:10px 12px;
+    border:1px solid var(--border);
+    border-radius:16px;
+    background:rgba(39,21,61,.42);
+    color:var(--muted-2);
+    font-size:12px;
+    backdrop-filter:blur(14px);
+  }
+
+  .history-pager{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:8px;
+    margin:14px 0 2px;
+  }
+
+  .pager-btn{
+    min-width:42px;
+    padding:10px 12px;
+    border-radius:14px;
+    border:1px solid var(--border);
+    background:rgba(255,233,237,.10);
+    color:var(--lavender-blush);
+    font-weight:850;
+    backdrop-filter:blur(12px);
+  }
+
+  .pager-btn:disabled{
+    opacity:.35;
+    cursor:not-allowed;
+  }
+
+  .pager-text{
+    min-width:96px;
+    text-align:center;
+    color:var(--muted-2);
+    font-size:12px;
+    font-weight:750;
+  }
+
   .config-screen{
     position:fixed;
     inset:0;
@@ -635,6 +682,8 @@ let config = {};
 let selectedPersona = "", selectedGrupo = "", selectedEjercicio = "";
 let sessionEntries = [], chartPersona = "", myChart = null;
 let historicalImported = false;
+const HISTORIAL_PAGE_SIZE = 25;
+let historialPage = 1;
 
 // ─── CREDENTIALS ───
 async function initSupabase() {
@@ -928,18 +977,53 @@ function renderSessionEntries() {
 // ─── HISTORIAL ───
 function renderHistorial() {
   const el = document.getElementById('historial-list');
-  const list = [...sessions].reverse().slice(0,100);
-  if (!list.length) { el.innerHTML='<div class="no-data">Sin entradas todavía</div>'; return; }
-  el.innerHTML = list.map(s => {
-    const pc=personaColor(s.persona);
+  const list = [...sessions].sort((a,b) => {
+    const byDate = String(b.fecha || '').localeCompare(String(a.fecha || ''));
+    if (byDate !== 0) return byDate;
+    return Number(b.id || 0) - Number(a.id || 0);
+  });
+
+  if (!list.length) {
+    el.innerHTML = '<div class="no-data">Sin entradas todavía</div>';
+    return;
+  }
+
+  const totalPages = Math.max(1, Math.ceil(list.length / HISTORIAL_PAGE_SIZE));
+  historialPage = Math.min(Math.max(historialPage, 1), totalPages);
+
+  const start = (historialPage - 1) * HISTORIAL_PAGE_SIZE;
+  const end = start + HISTORIAL_PAGE_SIZE;
+  const pageItems = list.slice(start, end);
+
+  const summary = `<div class="history-summary">
+    <span>${esc(list.length)} entradas</span>
+    <span>Mostrando ${esc(start + 1)}-${esc(Math.min(end, list.length))}</span>
+  </div>`;
+
+  const cards = pageItems.map(s => {
+    const pc = personaColor(s.persona);
     return `<div class="entry-card" style="border-left-color:${groupColor(s.grupo)}">
       <div>
         <div class="entry-title">${esc(s.ejercicio || '—')}</div>
         <div class="entry-sub">${esc(s.fecha)} · <span style="color:${pc}">${esc(s.persona)}</span> · ${esc(s.series)}×${esc(s.reps)} · ${esc(s.peso)}kg</div>
       </div>
-      <button class="del-btn" onclick="deleteEntry(${s.id})">×</button>
+      <button class="del-btn" onclick="deleteEntry(${Number(s.id)})">×</button>
     </div>`;
   }).join('');
+
+  const pager = totalPages > 1 ? `<div class="history-pager">
+    <button class="pager-btn" onclick="setHistorialPage(${historialPage - 1})" ${historialPage <= 1 ? 'disabled' : ''}>‹</button>
+    <div class="pager-text">Página ${esc(historialPage)} / ${esc(totalPages)}</div>
+    <button class="pager-btn" onclick="setHistorialPage(${historialPage + 1})" ${historialPage >= totalPages ? 'disabled' : ''}>›</button>
+  </div>` : '';
+
+  el.innerHTML = summary + cards + pager;
+}
+
+function setHistorialPage(page) {
+  historialPage = page;
+  renderHistorial();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
 async function deleteEntry(id) {
