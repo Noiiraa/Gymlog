@@ -379,6 +379,98 @@
   }
   .toast.show{opacity:1;}
 
+
+  .history-tools{
+    margin-bottom:12px;
+    padding:12px;
+    border:1px solid var(--border);
+    border-radius:18px;
+    background:rgba(39,21,61,.42);
+    backdrop-filter:blur(14px);
+    box-shadow:0 10px 28px rgba(12,5,24,.18);
+  }
+
+  .history-tools-title{
+    font-size:11px;
+    color:var(--lavender-blush);
+    font-weight:850;
+    text-transform:uppercase;
+    letter-spacing:1px;
+    margin-bottom:9px;
+    opacity:.82;
+  }
+
+  .history-filters{
+    display:flex;
+    gap:7px;
+    flex-wrap:wrap;
+  }
+
+  .history-filter-btn{
+    padding:8px 12px;
+    border-radius:999px;
+    border:1px solid var(--border);
+    background:rgba(255,233,237,.08);
+    color:rgba(255,233,237,.72);
+    font-size:12px;
+    font-weight:800;
+    backdrop-filter:blur(12px);
+  }
+
+  .history-filter-btn.active{
+    background:linear-gradient(135deg,var(--powder-blush),var(--lavender-blush));
+    color:var(--dark-amethyst);
+    border-color:rgba(255,233,237,.45);
+    box-shadow:0 10px 22px rgba(246,182,183,.18);
+  }
+
+  .history-summary{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
+    margin-bottom:12px;
+    padding:10px 12px;
+    border:1px solid var(--border);
+    border-radius:16px;
+    background:rgba(39,21,61,.42);
+    color:var(--muted-2);
+    font-size:12px;
+    backdrop-filter:blur(14px);
+  }
+
+  .history-pager{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:8px;
+    margin:14px 0 2px;
+  }
+
+  .pager-btn{
+    min-width:42px;
+    padding:10px 12px;
+    border-radius:14px;
+    border:1px solid var(--border);
+    background:rgba(255,233,237,.10);
+    color:var(--lavender-blush);
+    font-weight:850;
+    backdrop-filter:blur(12px);
+  }
+
+  .pager-btn:disabled{
+    opacity:.35;
+    cursor:not-allowed;
+  }
+
+  .pager-text{
+    min-width:96px;
+    text-align:center;
+    color:var(--muted-2);
+    font-size:12px;
+    font-weight:750;
+  }
+
   .config-screen{
     position:fixed;
     inset:0;
@@ -636,6 +728,9 @@ let config = {};
 let selectedPersona = "", selectedGrupo = "", selectedEjercicio = "";
 let sessionEntries = [], chartPersona = "", chartMode = "ejercicio", myChart = null;
 let historicalImported = false;
+const HISTORIAL_PAGE_SIZE = 25;
+let historialPage = 1;
+let historialPersona = "";
 
 // ─── CREDENTIALS ───
 async function initSupabase() {
@@ -929,9 +1024,43 @@ function renderSessionEntries() {
 // ─── HISTORIAL ───
 function renderHistorial() {
   const el = document.getElementById('historial-list');
-  const list = [...sessions].reverse().slice(0,100);
-  if (!list.length) { el.innerHTML='<div class="no-data">Sin entradas todavía</div>'; return; }
-  el.innerHTML = list.map(s => {
+  const personasHistorial = [...new Set([
+    ...config.personas,
+    ...sessions.map(s => s.persona).filter(Boolean)
+  ])].sort((a, b) => a.localeCompare(b));
+
+  const filters = `<div class="history-tools">
+    <div class="history-tools-title">Filtrar por persona</div>
+    <div class="history-filters">
+      <button class="history-filter-btn ${historialPersona === '' ? 'active' : ''}" onclick='setHistorialPersona("")'>Todas</button>
+      ${personasHistorial.map(p => `<button class="history-filter-btn ${historialPersona === p ? 'active' : ''}" onclick='setHistorialPersona(${JSON.stringify(p)})'>${esc(p)}</button>`).join('')}
+    </div>
+  </div>`;
+
+  const filtered = sessions
+    .filter(s => !historialPersona || s.persona === historialPersona)
+    .sort((a, b) => {
+      const byFecha = String(b.fecha || '').localeCompare(String(a.fecha || ''));
+      if (byFecha !== 0) return byFecha;
+      return (b.id || 0) - (a.id || 0);
+    });
+
+  if (!filtered.length) {
+    el.innerHTML = filters + '<div class="no-data">Sin entradas para este filtro</div>';
+    return;
+  }
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / HISTORIAL_PAGE_SIZE));
+  historialPage = Math.min(Math.max(historialPage, 1), totalPages);
+  const start = (historialPage - 1) * HISTORIAL_PAGE_SIZE;
+  const pageItems = filtered.slice(start, start + HISTORIAL_PAGE_SIZE);
+
+  const summary = `<div class="history-summary">
+    <span>${historialPersona ? esc(historialPersona) : 'Todas las personas'} · ${esc(filtered.length)} entradas</span>
+    <span>${esc(start + 1)}-${esc(start + pageItems.length)} de ${esc(filtered.length)}</span>
+  </div>`;
+
+  const cards = pageItems.map(s => {
     const pc=personaColor(s.persona);
     return `<div class="entry-card" style="border-left-color:${groupColor(s.grupo)}">
       <div>
@@ -941,6 +1070,26 @@ function renderHistorial() {
       <button class="del-btn" onclick="deleteEntry(${s.id})">×</button>
     </div>`;
   }).join('');
+
+  const pager = totalPages > 1 ? `<div class="history-pager">
+    <button class="pager-btn" onclick="setHistorialPage(${historialPage - 1})" ${historialPage <= 1 ? 'disabled' : ''}>‹</button>
+    <div class="pager-text">Página ${esc(historialPage)} / ${esc(totalPages)}</div>
+    <button class="pager-btn" onclick="setHistorialPage(${historialPage + 1})" ${historialPage >= totalPages ? 'disabled' : ''}>›</button>
+  </div>` : '';
+
+  el.innerHTML = filters + summary + cards + pager;
+}
+
+function setHistorialPersona(persona) {
+  historialPersona = persona;
+  historialPage = 1;
+  renderHistorial();
+}
+
+function setHistorialPage(page) {
+  historialPage = page;
+  renderHistorial();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
 async function deleteEntry(id) {
