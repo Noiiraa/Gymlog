@@ -274,6 +274,20 @@
 
   .entry-title{font-size:13px;font-weight:800;color:var(--lavender-blush);}
   .entry-sub{font-size:11px;color:var(--muted-2);margin-top:2px;}
+  .fase-badge{
+    display:inline-flex;
+    align-items:center;
+    gap:4px;
+    margin-top:5px;
+    padding:4px 8px;
+    border-radius:999px;
+    border:1px solid rgba(246,182,183,.28);
+    background:rgba(246,182,183,.12);
+    color:var(--lavender-blush);
+    font-size:10px;
+    font-weight:800;
+    letter-spacing:.2px;
+  }
   .del-btn{background:none;border:none;color:rgba(255,233,237,.48);font-size:20px;padding:0 4px;line-height:1;}
 
   .card{
@@ -562,6 +576,16 @@
     <div class="section">
       <label class="label">Persona</label>
       <div class="persona-btns" id="persona-btns"></div>
+    </div>
+    <div class="section">
+      <label class="label">Fase menstrual <span style="opacity:.55;text-transform:none;letter-spacing:0;">(opcional)</span></label>
+      <select id="reg-fase" class="input">
+        <option value="">Sin indicar / No aplica</option>
+        <option value="Menstruación">Menstruación</option>
+        <option value="Folicular">Folicular</option>
+        <option value="Ovulación">Ovulación</option>
+        <option value="Lútea">Lútea</option>
+      </select>
     </div>
     <div class="section">
       <label class="label">Grupo muscular</label>
@@ -870,7 +894,8 @@ async function importHistorical() {
 async function insertEntry(entry) {
   const { data, error } = await sbClient.from('sesiones').insert([{
     fecha: entry.fecha, persona: entry.persona, grupo: entry.grupo,
-    ejercicio: entry.ejercicio, series: entry.series, reps: entry.reps, peso: entry.peso
+    ejercicio: entry.ejercicio, series: entry.series, reps: entry.reps, peso: entry.peso,
+    fase_menstrual: entry.fase_menstrual || null
   }]).select().single();
   if (error) throw error;
   return data;
@@ -991,7 +1016,8 @@ async function saveEntry() {
     ejercicio: selectedEjercicio,
     series: parseInt(document.getElementById('reg-series').value),
     reps: parseInt(document.getElementById('reg-reps').value),
-    peso
+    peso,
+    fase_menstrual: document.getElementById('reg-fase').value || null
   };
   const btn = document.getElementById('btn-save');
   btn.textContent='Guardando...'; btn.className='btn-save saving'; btn.disabled=true;
@@ -1017,7 +1043,8 @@ function renderSessionEntries() {
   document.getElementById('session-list').innerHTML = sessionEntries.map(e =>
     `<div class="entry-card" style="border-left-color:${groupColor(e.grupo)}">
       <div><div class="entry-title">${esc(e.ejercicio)}</div>
-      <div class="entry-sub">${esc(e.persona)} · ${esc(e.series)}×${esc(e.reps)} · ${esc(e.peso)}kg</div></div>
+      <div class="entry-sub">${esc(e.persona)} · ${esc(e.series)}×${esc(e.reps)} · ${esc(e.peso)}kg</div>
+      ${e.fase_menstrual ? `<div class="fase-badge">🌙 ${esc(e.fase_menstrual)}</div>` : ''}</div>
     </div>`).join('');
 }
 
@@ -1066,6 +1093,7 @@ function renderHistorial() {
       <div>
         <div class="entry-title">${esc(s.ejercicio || '—')}</div>
         <div class="entry-sub">${esc(s.fecha)} · <span style="color:${pc}">${esc(s.persona)}</span> · ${esc(s.series)}×${esc(s.reps)} · ${esc(s.peso)}kg</div>
+        ${s.fase_menstrual ? `<div class="fase-badge">🌙 ${esc(s.fase_menstrual)}</div>` : ''}
       </div>
       <button class="del-btn" onclick="deleteEntry(${s.id})">×</button>
     </div>`;
