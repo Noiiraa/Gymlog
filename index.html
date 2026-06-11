@@ -737,7 +737,7 @@
     </div>
     <div class="section" id="ejercicio-section" style="display:none">
       <label class="label">Ejercicio</label>
-      <div class="ejercicio-list" id="ejercicio-list"></div>
+      <div id="ejercicio-list"></div>
     </div>
     <div class="grid3 section">
       <div>
@@ -1286,23 +1286,34 @@ function renderEjercicioBtns() {
   const sec = document.getElementById('ejercicio-section');
   if (!selectedGrupo) { sec.style.display='none'; return; }
   sec.style.display='block';
-  const ejs = config.ejercicios[selectedGrupo]||[];
-  const c = groupColor(selectedGrupo);
-  document.getElementById('ejercicio-list').innerHTML =
-    ejs.map(e => {
-      const sel = selectedEjercicio===e;
-      return `<button class="ej-btn" onclick='selectEjercicio(${JSON.stringify(e)}, false)'
-        style="border-color:${sel?c:'#F6B6B7'};background:${sel?c+'33':'rgba(39,21,61,.58)'};color:${sel?'#FFE9ED':'rgba(255,233,237,.72)'};font-weight:${sel?800:500}">${esc(e)}</button>`;
-    }).join('') +
-    `<input class="input" id="custom-ej-input" placeholder="✏️ Otro ejercicio..."
-      value="${selectedEjercicio&&!ejs.includes(selectedEjercicio)?selectedEjercicio:''}"
-      oninput="selectEjercicio(this.value,true)"
-      style="border-style:dashed;border-color:${selectedEjercicio&&!ejs.includes(selectedEjercicio)?'#F6B6B7':'rgba(255,233,237,.18)'}"/>`;
+
+  const ejs = config.ejercicios[selectedGrupo] || [];
+  const listId = 'ejercicio-options';
+  const placeholder = ejs.length
+    ? 'Busca o escribe un ejercicio...'
+    : 'Escribe un ejercicio...';
+
+  document.getElementById('ejercicio-list').innerHTML = `
+    <input
+      class="input"
+      id="reg-ejercicio"
+      list="${listId}"
+      placeholder="${placeholder}"
+      value="${esc(selectedEjercicio)}"
+      oninput="selectEjercicio(this.value, true)"
+      autocomplete="off"
+    />
+    <datalist id="${listId}">
+      ${ejs.map(e => `<option value="${esc(e)}"></option>`).join('')}
+    </datalist>
+    <div style="font-size:11px;color:var(--muted-2);margin-top:7px;line-height:1.4;">
+      Empieza a escribir para buscar. También puedes escribir uno nuevo si no aparece.
+    </div>
+  `;
 }
 
 function selectEjercicio(e, custom) {
-  selectedEjercicio=e;
-  if(!custom) renderEjercicioBtns();
+  selectedEjercicio = e.trim();
   updateSaveBtn();
 }
 
