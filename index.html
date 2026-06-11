@@ -933,6 +933,26 @@ function esc(value) {
     .replaceAll("'", '&#039;');
 }
 
+function formatDateDisplay(value) {
+  if (!value) return '';
+  const s = String(value);
+
+  // Supabase date normally arrives as YYYY-MM-DD.
+  const match = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (match) return `${match[3]}-${match[2]}-${match[1]}`;
+
+  // Fallback for any valid Date-like value.
+  const d = new Date(s);
+  if (!Number.isNaN(d.getTime())) {
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const year = d.getFullYear();
+    return `${day}-${month}-${year}`;
+  }
+
+  return s;
+}
+
 // ─── TABS ───
 function showTab(t) {
   document.querySelectorAll('.tab').forEach((b,i) => {
@@ -1092,7 +1112,7 @@ function renderHistorial() {
     return `<div class="entry-card" style="border-left-color:${groupColor(s.grupo)}">
       <div>
         <div class="entry-title">${esc(s.ejercicio || '—')}</div>
-        <div class="entry-sub">${esc(s.fecha)} · <span style="color:${pc}">${esc(s.persona)}</span> · ${esc(s.series)}×${esc(s.reps)} · ${esc(s.peso)}kg</div>
+        <div class="entry-sub">${esc(formatDateDisplay(s.fecha))} · <span style="color:${pc}">${esc(s.persona)}</span> · ${esc(s.series)}×${esc(s.reps)} · ${esc(s.peso)}kg</div>
         ${s.fase_menstrual ? `<div class="fase-badge">🌙 ${esc(s.fase_menstrual)}</div>` : ''}
       </div>
       <button class="del-btn" onclick="deleteEntry(${s.id})">×</button>
@@ -1238,7 +1258,7 @@ function renderChart() {
   if(myChart) myChart.destroy();
   myChart=new Chart(document.getElementById('myChart').getContext('2d'),{
     type:'line',
-    data:{labels:data.map(d=>d.fecha.slice(5)),datasets:[{
+    data:{labels:data.map(d=>formatDateDisplay(d.fecha)),datasets:[{
       label, data:data.map(d=>Number(d.valor.toFixed(1))),
       borderColor:color, backgroundColor:color+'22',
       pointBackgroundColor:color, pointRadius:5, pointHoverRadius:7,
