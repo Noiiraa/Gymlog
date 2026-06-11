@@ -245,6 +245,8 @@
 <script src="./js/config.js"></script>
 <script src="./js/state.js"></script>
 <script src="./js/helpers.js"></script>
+<script src="./js/auth.js"></script>
+<script src="./js/supabaseClient.js"></script>
 <script>
 
 
@@ -283,95 +285,8 @@ const HISTORICAL = [
   {fecha:"2026-05-06",persona:"María",grupo:"Piernas",ejercicio:"Prone leg curl",series:3,reps:8,peso:25},
 ];
 
-// ─── CREDENTIALS ───
-async function initSupabase() {
-  try {
-    sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-    const loginScreen = document.getElementById('login-screen');
-    const app = document.getElementById('app');
 
-    if (loginScreen) loginScreen.style.display = 'none';
-    if (app) app.style.display = 'none';
-
-    const { data, error } = await sbClient.auth.getSession();
-    if (error) throw error;
-
-    if (data.session) {
-      await startApp();
-    } else {
-      loginScreen.style.display = 'flex';
-    }
-
-    sbClient.auth.onAuthStateChange((_event, session) => {
-      if (session) {
-        startApp();
-      } else {
-        sessions = [];
-        sessionEntries = [];
-        app.style.display = 'none';
-        loginScreen.style.display = 'flex';
-      }
-    });
-
-  } catch(e) {
-    alert('Error inicializando Supabase: ' + e.message);
-    console.error(e);
-  }
-}
-
-async function startApp() {
-  document.getElementById('login-screen').style.display = 'none';
-  document.getElementById('app').style.display = 'block';
-
-  loadConfig();
-  await loadSessions();
-
-  const { data } = await sbClient.auth.getUser();
-  const email = data?.user?.email || 'usuario';
-
-  const conn = document.getElementById('conn-info');
-  if (conn) conn.textContent = `Sesión iniciada como: ${email}`;
-}
-
-async function login() {
-  const email = document.getElementById('login-email').value.trim();
-  const password = document.getElementById('login-password').value;
-
-  if (!email || !password) {
-    alert('Introduce email y contraseña');
-    return;
-  }
-
-  try {
-    const { error } = await sbClient.auth.signInWithPassword({
-      email,
-      password
-    });
-
-    if (error) throw error;
-
-    document.getElementById('login-password').value = '';
-    showToast('Sesión iniciada');
-  } catch (e) {
-    alert('No se pudo iniciar sesión: ' + e.message);
-    console.error(e);
-  }
-}
-
-async function logout() {
-  try {
-    const { error } = await sbClient.auth.signOut();
-    if (error) throw error;
-
-    sessions = [];
-    sessionEntries = [];
-    showToast('Sesión cerrada');
-  } catch (e) {
-    alert('Error cerrando sesión: ' + e.message);
-    console.error(e);
-  }
-}
 
 // ─── CONFIG (localStorage) ───
 function loadConfig() {
