@@ -511,6 +511,124 @@
     line-height:1.35;
   }
 
+
+
+  .entry-actions{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:8px;
+    flex-shrink:0;
+  }
+
+  .edit-btn{
+    width:28px;
+    height:28px;
+    border-radius:999px;
+    border:1px solid var(--border);
+    background:rgba(255,233,237,.10);
+    color:var(--lavender-blush);
+    font-size:13px;
+    font-weight:900;
+    line-height:1;
+    backdrop-filter:blur(12px);
+  }
+
+  .edit-btn:hover{
+    border-color:var(--powder-blush);
+    color:var(--powder-blush);
+  }
+
+  .edit-modal{
+    position:fixed;
+    inset:0;
+    z-index:300;
+    display:none;
+    align-items:flex-end;
+    justify-content:center;
+    padding:18px 12px;
+    background:rgba(8,6,16,.58);
+    backdrop-filter:blur(12px);
+  }
+
+  .edit-card{
+    width:100%;
+    max-width:480px;
+    max-height:92vh;
+    overflow:auto;
+    border:1px solid var(--border-strong);
+    border-radius:24px;
+    background:rgba(39,21,61,.94);
+    box-shadow:var(--shadow);
+    padding:18px;
+  }
+
+  .edit-card-header{
+    display:flex;
+    align-items:flex-start;
+    justify-content:space-between;
+    gap:12px;
+    margin-bottom:16px;
+  }
+
+  .edit-card-title{
+    font-size:18px;
+    font-weight:900;
+    color:var(--lavender-blush);
+    letter-spacing:-.4px;
+  }
+
+  .edit-card-sub{
+    margin-top:3px;
+    color:var(--muted-2);
+    font-size:12px;
+    line-height:1.35;
+  }
+
+  .modal-close{
+    width:34px;
+    height:34px;
+    border-radius:999px;
+    border:1px solid var(--border);
+    background:rgba(255,233,237,.08);
+    color:var(--lavender-blush);
+    font-size:20px;
+    line-height:1;
+  }
+
+  .edit-grid{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:12px;
+  }
+
+  .edit-grid .full{
+    grid-column:1 / -1;
+  }
+
+  .modal-actions{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:10px;
+    margin-top:16px;
+  }
+
+  .btn-secondary{
+    width:100%;
+    padding:14px;
+    border-radius:18px;
+    border:1px solid var(--border);
+    background:rgba(255,233,237,.08);
+    color:var(--lavender-blush);
+    font-size:14px;
+    font-weight:850;
+    backdrop-filter:blur(12px);
+  }
+
+  @media (min-width:520px){
+    .edit-modal{align-items:center;}
+  }
+
   .config-screen{
     position:fixed;
     inset:0;
@@ -718,6 +836,69 @@
        <div style="font-size:12px;color:#64748b;margin-bottom:10px;" id="conn-info"></div>
        <button class="export-btn" onclick="logout()" style="margin-bottom:8px;">🚪 Cerrar sesión</button>
      </div>
+  </div>
+</div>
+
+
+<!-- EDIT ENTRY MODAL -->
+<div class="edit-modal" id="edit-modal" onclick="if(event.target.id==='edit-modal')closeEditModal()">
+  <div class="edit-card">
+    <div class="edit-card-header">
+      <div>
+        <div class="edit-card-title">Editar registro</div>
+        <div class="edit-card-sub">Corrige fecha, persona, grupo, ejercicio, series, reps, peso o fase menstrual.</div>
+      </div>
+      <button class="modal-close" onclick="closeEditModal()">×</button>
+    </div>
+
+    <input type="hidden" id="edit-id"/>
+
+    <div class="edit-grid">
+      <div>
+        <label class="label">Fecha</label>
+        <input type="date" id="edit-fecha" class="input"/>
+      </div>
+      <div>
+        <label class="label">Persona</label>
+        <select id="edit-persona" class="input"></select>
+      </div>
+      <div>
+        <label class="label">Grupo</label>
+        <select id="edit-grupo" class="input" onchange="renderEditEjercicioOptions()"></select>
+      </div>
+      <div>
+        <label class="label">Fase</label>
+        <select id="edit-fase" class="input">
+          <option value="">Sin indicar / No aplica</option>
+          <option value="Menstruación">Menstruación</option>
+          <option value="Folicular">Folicular</option>
+          <option value="Ovulación">Ovulación</option>
+          <option value="Lútea">Lútea</option>
+        </select>
+      </div>
+      <div class="full">
+        <label class="label">Ejercicio</label>
+        <input id="edit-ejercicio" class="input" list="edit-ejercicios-list" placeholder="Nombre del ejercicio"/>
+        <datalist id="edit-ejercicios-list"></datalist>
+      </div>
+      <div>
+        <label class="label">Series</label>
+        <input type="number" id="edit-series" class="input" min="1" max="20" step="1"/>
+      </div>
+      <div>
+        <label class="label">Reps</label>
+        <input type="number" id="edit-reps" class="input" min="1" max="200" step="1"/>
+      </div>
+      <div class="full">
+        <label class="label">Peso (kg)</label>
+        <input type="number" id="edit-peso" class="input" min="0" max="500" step="0.5"/>
+      </div>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn-secondary" onclick="closeEditModal()">Cancelar</button>
+      <button class="btn-primary" onclick="saveEditEntry()">Guardar cambios</button>
+    </div>
   </div>
 </div>
 
@@ -945,6 +1126,21 @@ async function insertEntry(entry) {
 async function deleteEntryDB(id) {
   const { error } = await sbClient.from('sesiones').delete().eq('id', id);
   if (error) throw error;
+}
+
+async function updateEntryDB(id, entry) {
+  const { data, error } = await sbClient.from('sesiones').update({
+    fecha: entry.fecha,
+    persona: entry.persona,
+    grupo: entry.grupo,
+    ejercicio: entry.ejercicio,
+    series: entry.series,
+    reps: entry.reps,
+    peso: entry.peso,
+    fase_menstrual: entry.fase_menstrual || null
+  }).eq('id', id).select().single();
+  if (error) throw error;
+  return data;
 }
 
 // ─── HELPERS ───
@@ -1201,7 +1397,10 @@ function renderHistorial() {
         <div class="entry-sub">${esc(formatDateDisplay(s.fecha))} · <span style="color:${pc}">${esc(s.persona)}</span> · ${esc(s.series)}×${esc(s.reps)} · ${esc(s.peso)}kg</div>
         ${s.fase_menstrual ? `<div class="fase-badge">🌙 ${esc(s.fase_menstrual)}</div>` : ''}
       </div>
-      <button class="del-btn" onclick="deleteEntry(${s.id})">×</button>
+      <div class="entry-actions">
+        <button class="edit-btn" onclick="openEditEntry(${s.id})" title="Editar">✎</button>
+        <button class="del-btn" onclick="deleteEntry(${s.id})" title="Borrar">×</button>
+      </div>
     </div>`;
   }).join('');
 
@@ -1224,6 +1423,93 @@ function setHistorialPage(page) {
   historialPage = page;
   renderHistorial();
   window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function fillSelectOptions(selectId, values, selectedValue) {
+  const el = document.getElementById(selectId);
+  const clean = [...new Set(values.filter(Boolean))];
+  el.innerHTML = clean.map(v => `<option value="${esc(v)}"${v === selectedValue ? ' selected' : ''}>${esc(v)}</option>`).join('');
+  if (selectedValue && !clean.includes(selectedValue)) {
+    el.innerHTML = `<option value="${esc(selectedValue)}" selected>${esc(selectedValue)}</option>` + el.innerHTML;
+  }
+}
+
+function renderEditEjercicioOptions() {
+  const grupo = document.getElementById('edit-grupo').value;
+  const ejs = config.ejercicios?.[grupo] || [];
+  document.getElementById('edit-ejercicios-list').innerHTML = ejs
+    .map(e => `<option value="${esc(e)}"></option>`)
+    .join('');
+}
+
+function openEditEntry(id) {
+  const entry = sessions.find(s => Number(s.id) === Number(id));
+  if (!entry) {
+    showToast('No encuentro ese registro');
+    return;
+  }
+
+  document.getElementById('edit-id').value = entry.id;
+  document.getElementById('edit-fecha').value = normalizeDateValue(entry.fecha);
+
+  fillSelectOptions('edit-persona', [
+    ...config.personas,
+    ...sessions.map(s => s.persona)
+  ], entry.persona);
+
+  fillSelectOptions('edit-grupo', [
+    ...Object.keys(config.ejercicios || {}),
+    ...sessions.map(s => s.grupo)
+  ], entry.grupo);
+
+  document.getElementById('edit-ejercicio').value = entry.ejercicio || '';
+  document.getElementById('edit-series').value = entry.series || '';
+  document.getElementById('edit-reps').value = entry.reps || '';
+  document.getElementById('edit-peso').value = entry.peso ?? '';
+  document.getElementById('edit-fase').value = entry.fase_menstrual || '';
+  renderEditEjercicioOptions();
+
+  document.getElementById('edit-modal').style.display = 'flex';
+}
+
+function closeEditModal() {
+  document.getElementById('edit-modal').style.display = 'none';
+}
+
+async function saveEditEntry() {
+  const id = Number(document.getElementById('edit-id').value);
+  const entry = {
+    fecha: document.getElementById('edit-fecha').value,
+    persona: document.getElementById('edit-persona').value,
+    grupo: document.getElementById('edit-grupo').value || 'Otros',
+    ejercicio: document.getElementById('edit-ejercicio').value.trim(),
+    series: parseInt(document.getElementById('edit-series').value, 10),
+    reps: parseInt(document.getElementById('edit-reps').value, 10),
+    peso: parseFloat(document.getElementById('edit-peso').value),
+    fase_menstrual: document.getElementById('edit-fase').value || null
+  };
+
+  if (!id || !entry.fecha || !entry.persona || !entry.grupo || !entry.ejercicio || !entry.series || !entry.reps || Number.isNaN(entry.peso)) {
+    alert('Revisa los campos: fecha, persona, grupo, ejercicio, series, reps y peso son obligatorios.');
+    return;
+  }
+
+  try {
+    const saved = await updateEntryDB(id, entry);
+    sessions = sessions.map(s => Number(s.id) === id ? saved : s);
+    sessionEntries = sessionEntries.map(s => Number(s.id) === id ? saved : s);
+
+    updateHeaderStats();
+    renderHistorial();
+    renderSessionEntries();
+    if (document.getElementById('page-progreso').classList.contains('active')) renderProgreso();
+
+    closeEditModal();
+    showToast('Registro actualizado');
+  } catch (e) {
+    showToast('Error actualizando registro');
+    console.error(e);
+  }
 }
 
 async function deleteEntry(id) {
@@ -1441,6 +1727,10 @@ function addEjercicio() {
 function removeEjercicio(g,e) {
   config.ejercicios[g]=config.ejercicios[g].filter(x=>x!==e); saveConfigLocal(); renderEjerciciosAdmin();
 }
+
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape') closeEditModal();
+});
 
 // ─── BOOT ───
 initSupabase();
