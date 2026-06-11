@@ -247,45 +247,8 @@
 <script src="./js/helpers.js"></script>
 <script src="./js/auth.js"></script>
 <script src="./js/supabaseClient.js"></script>
+<script src="./js/data.js"></script>
 <script>
-
-
-const HISTORICAL = [
-  {fecha:"2026-03-28",persona:"María",grupo:"Pecho",ejercicio:"Jalón de pecho divergente",series:3,reps:12,peso:27},
-  {fecha:"2026-03-28",persona:"María",grupo:"Pecho",ejercicio:"Remo sentado divergente",series:3,reps:12,peso:27},
-  {fecha:"2026-03-28",persona:"María",grupo:"Brazos",ejercicio:"Polea biceps (dos manos)",series:3,reps:9,peso:12},
-  {fecha:"2026-03-28",persona:"María",grupo:"Brazos",ejercicio:"Pesitas biceps",series:3,reps:8,peso:4},
-  {fecha:"2026-03-31",persona:"Juanmi",grupo:"Piernas",ejercicio:"Prensa de piernas",series:3,reps:9,peso:66},
-  {fecha:"2026-03-31",persona:"María",grupo:"Piernas",ejercicio:"Prensa de piernas",series:3,reps:8,peso:52},
-  {fecha:"2026-03-31",persona:"Juanmi",grupo:"Piernas",ejercicio:"Extensión de piernas",series:3,reps:8,peso:45},
-  {fecha:"2026-03-31",persona:"María",grupo:"Piernas",ejercicio:"Extensión de piernas",series:3,reps:9,peso:32},
-  {fecha:"2026-03-31",persona:"Juanmi",grupo:"Piernas",ejercicio:"Abductor para fuera",series:3,reps:8,peso:45},
-  {fecha:"2026-03-31",persona:"María",grupo:"Piernas",ejercicio:"Abductor para fuera",series:3,reps:9,peso:32},
-  {fecha:"2026-04-03",persona:"Juanmi",grupo:"Espalda",ejercicio:"Remo sentado divergente",series:3,reps:8,peso:52},
-  {fecha:"2026-04-03",persona:"María",grupo:"Espalda",ejercicio:"Remo sentado divergente",series:3,reps:8,peso:32},
-  {fecha:"2026-04-03",persona:"Juanmi",grupo:"Pecho",ejercicio:"Jalón de pecho divergente",series:3,reps:7,peso:54.3},
-  {fecha:"2026-04-03",persona:"María",grupo:"Pecho",ejercicio:"Jalón de pecho divergente",series:3,reps:8,peso:32},
-  {fecha:"2026-04-03",persona:"Juanmi",grupo:"Brazos",ejercicio:"Curl bicep",series:3,reps:8,peso:20},
-  {fecha:"2026-04-03",persona:"María",grupo:"Brazos",ejercicio:"Pesitas biceps",series:3,reps:9,peso:5},
-  {fecha:"2026-04-25",persona:"Juanmi",grupo:"Piernas",ejercicio:"Prensa de piernas",series:3,reps:8,peso:66},
-  {fecha:"2026-04-25",persona:"María",grupo:"Piernas",ejercicio:"Prensa de piernas",series:3,reps:8,peso:52},
-  {fecha:"2026-04-25",persona:"Juanmi",grupo:"Piernas",ejercicio:"Abductor para fuera",series:3,reps:8,peso:39},
-  {fecha:"2026-04-25",persona:"María",grupo:"Piernas",ejercicio:"Abductor para fuera",series:3,reps:10,peso:37.3},
-  {fecha:"2026-04-30",persona:"Juanmi",grupo:"Pecho",ejercicio:"Press de pecho",series:3,reps:10,peso:45},
-  {fecha:"2026-04-30",persona:"María",grupo:"Pecho",ejercicio:"Press de pecho",series:3,reps:8,peso:25},
-  {fecha:"2026-04-30",persona:"Juanmi",grupo:"Pecho",ejercicio:"Rear delt",series:3,reps:8,peso:73},
-  {fecha:"2026-04-30",persona:"María",grupo:"Pecho",ejercicio:"Rear delt",series:3,reps:7,peso:32},
-  {fecha:"2026-04-30",persona:"Juanmi",grupo:"Brazos",ejercicio:"Seated triceps press",series:3,reps:8,peso:82},
-  {fecha:"2026-04-30",persona:"María",grupo:"Brazos",ejercicio:"Seated triceps press",series:3,reps:8,peso:32},
-  {fecha:"2026-05-06",persona:"Juanmi",grupo:"Pecho",ejercicio:"Chest press",series:3,reps:8,peso:50},
-  {fecha:"2026-05-06",persona:"María",grupo:"Pecho",ejercicio:"Chest press",series:3,reps:8,peso:25},
-  {fecha:"2026-05-06",persona:"Juanmi",grupo:"Espalda",ejercicio:"Upper back",series:3,reps:8,peso:42.5},
-  {fecha:"2026-05-06",persona:"María",grupo:"Espalda",ejercicio:"Upper back",series:3,reps:8,peso:22.5},
-  {fecha:"2026-05-06",persona:"Juanmi",grupo:"Piernas",ejercicio:"Prone leg curl",series:3,reps:8,peso:35},
-  {fecha:"2026-05-06",persona:"María",grupo:"Piernas",ejercicio:"Prone leg curl",series:3,reps:8,peso:25},
-];
-
-
 
 
 // ─── CONFIG (localStorage) ───
@@ -298,71 +261,7 @@ function loadConfig() {
 }
 function saveConfigLocal() { localStorage.setItem(CONFIG_KEY, JSON.stringify(config)); }
 
-// ─── SUPABASE SESSIONS ───
-function setSyncing(state) {
-  const dot = document.getElementById('sync-dot');
-  dot.className = 'sync-dot' + (state === 'syncing' ? ' syncing' : state === 'error' ? ' error' : '');
-}
 
-async function loadSessions() {
-  setSyncing('syncing');
-  try {
-    const { data, error } = await sbClient.from('sesiones').select('*').order('fecha', {ascending:true}).order('id', {ascending:true});
-    if (error) throw error;
-    sessions = data || [];
-    // Import historical if DB is empty
-    // Import histórico desactivado en producción.
-    // Si necesitas importar datos antiguos, hazlo una sola vez desde Supabase SQL o desde un script controlado.
-    setSyncing('ok');
-    updateHeaderStats();
-    renderSessionEntries();
-  } catch(e) {
-    setSyncing('error'); showToast('Error cargando datos'); console.error(e);
-  }
-}
-
-async function importHistorical() {
-  setSyncing('syncing');
-  try {
-    const rows = HISTORICAL.map(h => ({fecha:h.fecha, persona:h.persona, grupo:h.grupo, ejercicio:h.ejercicio, series:h.series, reps:h.reps, peso:h.peso}));
-    const { error } = await sbClient.from('sesiones').insert(rows);
-    if (error) throw error;
-    showToast('✅ Datos históricos importados');
-    await loadSessions();
-  } catch(e) {
-    setSyncing('error'); showToast('Error importando histórico'); console.error(e);
-  }
-}
-
-async function insertEntry(entry) {
-  const { data, error } = await sbClient.from('sesiones').insert([{
-    fecha: entry.fecha, persona: entry.persona, grupo: entry.grupo,
-    ejercicio: entry.ejercicio, series: entry.series, reps: entry.reps, peso: entry.peso,
-    fase_menstrual: entry.fase_menstrual || null
-  }]).select().single();
-  if (error) throw error;
-  return data;
-}
-
-async function deleteEntryDB(id) {
-  const { error } = await sbClient.from('sesiones').delete().eq('id', id);
-  if (error) throw error;
-}
-
-async function updateEntryDB(id, entry) {
-  const { data, error } = await sbClient.from('sesiones').update({
-    fecha: entry.fecha,
-    persona: entry.persona,
-    grupo: entry.grupo,
-    ejercicio: entry.ejercicio,
-    series: entry.series,
-    reps: entry.reps,
-    peso: entry.peso,
-    fase_menstrual: entry.fase_menstrual || null
-  }).eq('id', id).select().single();
-  if (error) throw error;
-  return data;
-}
 
 // ─── TABS ───
 function showTab(t) {
