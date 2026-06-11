@@ -1095,6 +1095,7 @@ async function loadSessions() {
     // Si necesitas importar datos antiguos, hazlo una sola vez desde Supabase SQL o desde un script controlado.
     setSyncing('ok');
     updateHeaderStats();
+    renderSessionEntries();
   } catch(e) {
     setSyncing('error'); showToast('Error cargando datos'); console.error(e);
   }
@@ -1242,6 +1243,7 @@ function showTab(t) {
   });
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.getElementById('page-'+t).classList.add('active');
+  if (t==='registro') renderSessionEntries();
   if (t==='historial') renderHistorial();
   if (t==='progreso') renderProgreso();
   if (t==='ajustes') renderAjustes();
@@ -1249,9 +1251,12 @@ function showTab(t) {
 
 // ─── REGISTRO ───
 function initRegistro() {
-  document.getElementById('reg-fecha').value = new Date().toISOString().split('T')[0];
+  const fechaEl = document.getElementById('reg-fecha');
+  fechaEl.value = fechaEl.value || new Date().toISOString().split('T')[0];
+  fechaEl.onchange = renderSessionEntries;
   renderPersonaBtns();
   renderGrupoBtns();
+  renderSessionEntries();
 }
 
 function renderPersonaBtns() {
@@ -1326,7 +1331,6 @@ async function saveEntry() {
   try {
     const saved = await insertEntry(entry);
     sessions.push(saved);
-    sessionEntries.push(saved);
     document.getElementById('reg-peso').value='';
     updateHeaderStats();
     renderSessionEntries();
@@ -1338,15 +1342,45 @@ async function saveEntry() {
   }
 }
 
+function getRegistroFecha() {
+  return document.getElementById('reg-fecha')?.value || new Date().toISOString().split('T')[0];
+}
+
+function getRegistroDayEntries() {
+  const fecha = getRegistroFecha();
+  return sessions
+    .filter(s => normalizeDateValue(s.fecha) === fecha)
+    .sort((a, b) => (b.id || 0) - (a.id || 0));
+}
+
 function renderSessionEntries() {
-  if (!sessionEntries.length) { document.getElementById('session-entries').style.display='none'; return; }
-  document.getElementById('session-entries').style.display='block';
-  document.getElementById('session-count').textContent=`Esta sesión (${sessionEntries.length})`;
-  document.getElementById('session-list').innerHTML = sessionEntries.map(e =>
+  const box = document.getElementById('session-entries');
+  const listEl = document.getElementById('session-list');
+  const titleEl = document.getElementById('session-count');
+  if (!box || !listEl || !titleEl) return;
+
+  const fecha = getRegistroFecha();
+  const entries = getRegistroDayEntries();
+
+  if (!entries.length) {
+    box.style.display='none';
+    listEl.innerHTML = '';
+    return;
+  }
+
+  box.style.display='block';
+  titleEl.textContent = `Entradas del ${formatDateDisplay(fecha)} (${entries.length})`;
+  listEl.innerHTML = entries.map(e =>
     `<div class="entry-card" style="border-left-color:${groupColor(e.grupo)}">
-      <div><div class="entry-title">${esc(e.ejercicio)}</div>
-      <div class="entry-sub">${esc(e.persona)} · ${esc(e.series)}×${esc(e.reps)} · ${esc(e.peso)}kg</div>
-      ${e.fase_menstrual ? `<div class="fase-badge">🌙 ${esc(e.fase_menstrual)}</div>` : ''}</div>
+      <div>
+        <div class="entry-title">${esc(e.ejercicio)}</div>
+        <div class="entry-sub">${esc(e.persona)} · ${esc(e.grupo || 'Otros')} · ${esc(e.series)}×${esc(e.reps)} · ${esc(e.peso)}kg</div>
+        ${e.fase_menstrual ? `<div class="fase-badge">🌙 ${esc(e.fase_menstrual)}</div>` : ''}
+      </div>
+      <div class="entry-actions">
+        <button class="edit-btn" onclick="openEditEntry(${e.id})" title="Editar">✎</button>
+        <button class="del-btn" onclick="deleteEntry(${e.id})" title="Borrar">×</button>
+      </div>
     </div>`).join('');
 }
 
@@ -1517,7 +1551,8 @@ async function deleteEntry(id) {
   try {
     await deleteEntryDB(id);
     sessions = sessions.filter(s=>s.id!==id);
-    updateHeaderStats(); renderHistorial();
+    sessionEntries = sessionEntries.filter(s=>Number(s.id)!==Number(id));
+    updateHeaderStats(); renderHistorial(); renderSessionEntries();
   } catch(e) { showToast('Error borrando'); }
 }
 
