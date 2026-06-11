@@ -485,6 +485,32 @@
     font-weight:750;
   }
 
+
+
+  .chart-date-filters{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:9px;
+    margin-bottom:12px;
+  }
+
+  .chart-date-filter-actions{
+    display:flex;
+    gap:8px;
+    margin-bottom:12px;
+  }
+
+  .chart-date-filter-actions .export-btn{
+    margin-top:0;
+  }
+
+  .filter-note{
+    margin:-4px 0 12px;
+    color:var(--muted-2);
+    font-size:11px;
+    line-height:1.35;
+  }
+
   .config-screen{
     position:fixed;
     inset:0;
@@ -636,6 +662,21 @@
       <div class="btn-row" id="chart-persona-btns" style="margin-bottom:10px;"></div>
       <div class="btn-row" id="chart-mode-btns" style="margin-bottom:10px;"></div>
       <select id="chart-target" class="input" style="margin-bottom:12px;" onchange="renderChart()"></select>
+      <div class="chart-date-filters">
+        <div>
+          <label class="label">Desde</label>
+          <input type="date" id="chart-date-from" class="input" onchange="renderChart()"/>
+        </div>
+        <div>
+          <label class="label">Hasta</label>
+          <input type="date" id="chart-date-to" class="input" onchange="renderChart()"/>
+        </div>
+      </div>
+      <div class="chart-date-filter-actions">
+        <button class="export-btn" onclick="setChartDatePreset('all')">Todo</button>
+        <button class="export-btn" onclick="setChartDatePreset('last90')">Últimos 3 meses</button>
+      </div>
+      <div class="filter-note" id="chart-date-note"></div>
       <div id="chart-container">
         <div class="chart-wrap"><canvas id="myChart" height="200"></canvas></div>
         <div class="chart-stat" id="chart-stat"></div>
@@ -953,6 +994,51 @@ function formatDateDisplay(value) {
   return s;
 }
 
+function normalizeDateValue(value) {
+  if (!value) return '';
+  const s = String(value);
+  const match = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return match ? `${match[1]}-${match[2]}-${match[3]}` : '';
+}
+
+function getChartDateRange() {
+  const from = document.getElementById('chart-date-from')?.value || '';
+  const to = document.getElementById('chart-date-to')?.value || '';
+  return { from, to };
+}
+
+function isWithinChartDateRange(fecha) {
+  const date = normalizeDateValue(fecha);
+  const { from, to } = getChartDateRange();
+  if (!date) return false;
+  if (from && date < from) return false;
+  if (to && date > to) return false;
+  return true;
+}
+
+function setChartDatePreset(mode) {
+  const fromEl = document.getElementById('chart-date-from');
+  const toEl = document.getElementById('chart-date-to');
+  if (!fromEl || !toEl) return;
+
+  if (mode === 'all') {
+    fromEl.value = '';
+    toEl.value = '';
+    renderChart();
+    return;
+  }
+
+  if (mode === 'last90') {
+    const dates = sessions.map(s => normalizeDateValue(s.fecha)).filter(Boolean).sort();
+    const maxDate = dates.at(-1) || new Date().toISOString().split('T')[0];
+    const d = new Date(maxDate + 'T00:00:00');
+    d.setDate(d.getDate() - 90);
+    fromEl.value = d.toISOString().split('T')[0];
+    toEl.value = maxDate;
+    renderChart();
+  }
+}
+
 // ─── TABS ───
 function showTab(t) {
   document.querySelectorAll('.tab').forEach((b,i) => {
@@ -1220,6 +1306,7 @@ function renderChartTargetSelect() {
 function getChartData(target) {
   const filtered = sessions.filter(s =>
     s.persona === chartPersona &&
+    isWithinChartDateRange(s.fecha) &&
     (chartMode === 'grupo' ? s.grupo === target : s.ejercicio === target)
   );
 
@@ -1243,11 +1330,18 @@ function getChartData(target) {
 function renderChart() {
   const target = document.getElementById('chart-target').value;
   const data = getChartData(target);
+  const { from, to } = getChartDateRange();
+  const note = document.getElementById('chart-date-note');
+  if (note) {
+    note.textContent = from || to
+      ? `Filtro activo: ${from ? formatDateDisplay(from) : 'inicio'} → ${to ? formatDateDisplay(to) : 'hoy'}`
+      : 'Sin filtro de fechas: se muestran todos los registros disponibles para este gráfico.';
+  }
 
   const cont=document.getElementById('chart-container'), emp=document.getElementById('chart-empty');
   emp.textContent = chartMode === 'grupo'
-    ? 'Necesitas al menos 2 días con este grupo muscular'
-    : 'Necesitas al menos 2 sesiones con este ejercicio';
+    ? 'Necesitas al menos 2 días con este grupo muscular en el rango seleccionado'
+    : 'Necesitas al menos 2 sesiones con este ejercicio en el rango seleccionado';
   if(data.length<2){ cont.style.display='none'; emp.style.display='block'; return; }
   cont.style.display='block'; emp.style.display='none';
 
