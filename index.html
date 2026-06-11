@@ -244,6 +244,8 @@
 
 <script src="./js/config.js"></script>
 
+<script src="./js/state.js"></script>
+
 <script>
 
 
@@ -281,17 +283,6 @@ const HISTORICAL = [
   {fecha:"2026-05-06",persona:"Juanmi",grupo:"Piernas",ejercicio:"Prone leg curl",series:3,reps:8,peso:35},
   {fecha:"2026-05-06",persona:"María",grupo:"Piernas",ejercicio:"Prone leg curl",series:3,reps:8,peso:25},
 ];
-
-// ─── STATE ───
-let sbClient = null;
-let sessions = [];
-let config = {};
-let selectedPersona = "", selectedGrupo = "", selectedEjercicio = "";
-let sessionEntries = [], chartPersona = "", chartMode = "ejercicio", myChart = null;
-let historicalImported = false;
-const HISTORIAL_PAGE_SIZE = 25;
-let historialPage = 1;
-let historialPersona = "";
 
 // ─── CREDENTIALS ───
 async function initSupabase() {
