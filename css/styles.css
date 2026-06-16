@@ -393,6 +393,8 @@ border-radius:18px;
 background:rgba(39,21,61,.42);
 backdrop-filter:blur(14px);
 box-shadow:0 10px 28px rgba(12,5,24,.18);
+position:relative;
+z-index:20;
 }
 
 .history-tools-title{
