@@ -44,15 +44,17 @@ function renderChartModeBtns() {
 
 function selectChartMode(mode) {
   chartMode = mode;
+  const input = document.getElementById('chart-target');
+  if (input) input.value = '';
   renderChartModeBtns();
   renderChartTargetSelect();
   renderChart();
 }
 
 function renderChartTargetSelect() {
-  const sel = document.getElementById('chart-target');
-  const list = document.getElementById('chart-target-options');
-  const cur = sel.value;
+  const input = document.getElementById('chart-target');
+  if (!input) return;
+
   const all = chartMode === 'grupo'
     ? uniqueSorted(sessions.map(s => s.grupo))
     : uniqueSorted(sessions.map(s => s.ejercicio));
@@ -61,13 +63,73 @@ function renderChartTargetSelect() {
     ? 'Evolución de volumen por grupo muscular'
     : 'Evolución de peso por máquina';
 
-  list.innerHTML = all.map(v =>
-    `<option value="${esc(v)}"></option>`
-  ).join('');
+}
 
-  if (all.length && !all.includes(sel.value)) {
-    sel.value = all[0];
+function openChartTargetDropdown() {
+  const list = document.getElementById('chart-target-options');
+  const input = document.getElementById('chart-target');
+  if (!list) return;
+  _renderChartTargetOptions(input?.value || '');
+  list.style.display = 'block';
+  if (input) {
+    input.style.borderBottomLeftRadius = '0';
+    input.style.borderBottomRightRadius = '0';
+    input.style.borderBottomColor = 'transparent';
   }
+}
+
+function closeChartTargetDropdown() {
+  const list = document.getElementById('chart-target-options');
+  const input = document.getElementById('chart-target');
+  if (list) list.style.display = 'none';
+  if (input) {
+    input.style.borderBottomLeftRadius = '';
+    input.style.borderBottomRightRadius = '';
+    input.style.borderBottomColor = '';
+  }
+}
+
+function onChartTargetInput(val) {
+  const list = document.getElementById('chart-target-options');
+  _renderChartTargetOptions(val);
+  if (list) list.style.display = 'block';
+  renderChart();
+}
+
+function _renderChartTargetOptions(query) {
+  const list = document.getElementById('chart-target-options');
+  if (!list) return;
+
+  const q = normalizeSearch(query);
+  const all = chartMode === 'grupo'
+    ? uniqueSorted(sessions.map(s => s.grupo))
+    : uniqueSorted(sessions.map(s => s.ejercicio));
+  const opts = all.filter(v => !q || normalizeSearch(v).includes(q));
+  const cur = document.getElementById('chart-target')?.value || '';
+
+  if (!opts.length) {
+    list.innerHTML = `<div style="padding:12px 13px;font-size:13px;color:rgba(255,233,237,.55)">${query ? 'Sin coincidencias' : 'Sin datos'}</div>`;
+    return;
+  }
+
+  list.innerHTML = opts.map(v => {
+    const sel = v === cur;
+    return `<div
+      data-value="${esc(v)}"
+      onmousedown="event.preventDefault()"
+      onclick="selectChartTargetOption(this.dataset.value)"
+      style="padding:12px 13px;font-size:14px;cursor:pointer;color:${sel?'#F6B6B7':'#FFE9ED'};font-weight:${sel?'700':'400'};background:${sel?'rgba(255,233,237,.10)':'transparent'};border-bottom:1px solid rgba(255,233,237,.07)"
+      onmouseover="this.style.background='rgba(255,233,237,.10)'"
+      onmouseout="this.style.background='${sel?'rgba(255,233,237,.10)':'transparent'}'"
+    >${esc(v)}</div>`;
+  }).join('');
+}
+
+function selectChartTargetOption(val) {
+  const input = document.getElementById('chart-target');
+  if (input) input.value = val;
+  closeChartTargetDropdown();
+  renderChart();
 }
 
 function getChartData(target) {
@@ -95,17 +157,28 @@ function getChartData(target) {
 }
 
 function renderChart() {
-  const target = document.getElementById('chart-target').value;
+  const target = document.getElementById('chart-target').value.trim();
+  const cont=document.getElementById('chart-container'), emp=document.getElementById('chart-empty');
+  const note = document.getElementById('chart-date-note');
+
+  if (!target) {
+    cont.style.display='none';
+    emp.style.display='block';
+    emp.textContent = chartMode === 'grupo'
+      ? 'Elige un grupo muscular para ver su evolución'
+      : 'Elige una máquina para ver su evolución';
+    if (note) note.textContent = '';
+    return;
+  }
+
   const data = getChartData(target);
   const { from, to } = getChartDateRange();
-  const note = document.getElementById('chart-date-note');
   if (note) {
     note.textContent = from || to
       ? `Filtro activo: ${from ? formatDateDisplay(from) : 'inicio'} → ${to ? formatDateDisplay(to) : 'hoy'}`
       : 'Sin filtro de fechas: se muestran todos los registros disponibles para este gráfico.';
   }
 
-  const cont=document.getElementById('chart-container'), emp=document.getElementById('chart-empty');
   emp.textContent = chartMode === 'grupo'
     ? 'Necesitas al menos 2 días con este grupo muscular en el rango seleccionado'
     : 'Necesitas al menos 2 sesiones con este ejercicio en el rango seleccionado';
