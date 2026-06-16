@@ -51,20 +51,23 @@ function selectChartMode(mode) {
 
 function renderChartTargetSelect() {
   const sel = document.getElementById('chart-target');
+  const list = document.getElementById('chart-target-options');
   const cur = sel.value;
   const all = chartMode === 'grupo'
-    ? [...new Set(sessions.map(s=>s.grupo).filter(Boolean))].sort()
-    : [...new Set(sessions.map(s=>s.ejercicio).filter(Boolean))].sort();
+    ? uniqueSorted(sessions.map(s => s.grupo))
+    : uniqueSorted(sessions.map(s => s.ejercicio));
 
   document.getElementById('chart-title').textContent = chartMode === 'grupo'
     ? 'Evolución de volumen por grupo muscular'
     : 'Evolución de peso por máquina';
 
-  sel.innerHTML = all.map(v =>
-    `<option value="${esc(v)}"${v===cur?' selected':''}>${esc(v)}</option>`
+  list.innerHTML = all.map(v =>
+    `<option value="${esc(v)}"></option>`
   ).join('');
 
-  if (all.length && !all.includes(sel.value)) sel.value = all[0];
+  if (all.length && !all.includes(sel.value)) {
+    sel.value = all[0];
+  }
 }
 
 function getChartData(target) {

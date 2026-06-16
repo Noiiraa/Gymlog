@@ -20,7 +20,7 @@ function renderPersonaBtns() {
 function selectPersona(p) { selectedPersona=p; renderPersonaBtns(); updateSaveBtn(); }
 
 function renderGrupoBtns() {
-  document.getElementById('grupo-btns').innerHTML = Object.keys(config.ejercicios).map(g => {
+  document.getElementById('grupo-btns').innerHTML = sortAlpha(Object.keys(config.ejercicios)).map(g => {
     const c=groupColor(g), sel=selectedGrupo===g;
     return `<button class="btn-pill" onclick='selectGrupo(${JSON.stringify(g)})'
       style="border-color:${sel?c:'rgba(255,233,237,.18)'};background:${sel?c+'22':'rgba(39,21,61,.58)'};color:${sel?c:'rgba(255,233,237,.72)'}">${esc(g)}</button>`;
@@ -37,7 +37,7 @@ function renderEjercicioBtns() {
   if (!selectedGrupo) { sec.style.display='none'; return; }
   sec.style.display='block';
 
-  const ejs = config.ejercicios[selectedGrupo] || [];
+  const ejs = sortAlpha(config.ejercicios[selectedGrupo] || []);
   const listId = 'ejercicio-options';
   const placeholder = ejs.length
     ? 'Busca o escribe un ejercicio...'
@@ -50,7 +50,8 @@ function renderEjercicioBtns() {
       list="${listId}"
       placeholder="${placeholder}"
       value="${esc(selectedEjercicio)}"
-      oninput="selectEjercicio(this.value, true)"
+      onfocus="updateRegistroEjercicioOptions('')"
+      oninput="selectEjercicio(this.value, true); updateRegistroEjercicioOptions(this.value)"
       autocomplete="off"
     />
     <datalist id="${listId}">
@@ -60,6 +61,18 @@ function renderEjercicioBtns() {
       Empieza a escribir para buscar. También puedes escribir uno nuevo si no aparece.
     </div>
   `;
+}
+
+function updateRegistroEjercicioOptions(query = "") {
+  const list = document.getElementById('ejercicio-options');
+  if (!list || !selectedGrupo) return;
+
+  const ejs = sortAlpha(config.ejercicios[selectedGrupo] || [])
+    .filter(e => startsWithSearch(e, query));
+
+  list.innerHTML = ejs
+    .map(e => `<option value="${esc(e)}"></option>`)
+    .join('');
 }
 
 function selectEjercicio(e, custom) {
