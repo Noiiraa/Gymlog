@@ -38,45 +38,91 @@ function renderEjercicioBtns() {
   sec.style.display='block';
 
   const ejs = sortAlpha(config.ejercicios[selectedGrupo] || []);
-  const listId = 'ejercicio-options';
-  const placeholder = ejs.length
-    ? 'Busca o escribe un ejercicio...'
-    : 'Escribe un ejercicio...';
+  const placeholder = ejs.length ? 'Busca o elige un ejercicio...' : 'Escribe un ejercicio...';
 
   document.getElementById('ejercicio-list').innerHTML = `
-    <input
-      class="input"
-      id="reg-ejercicio"
-      list="${listId}"
-      placeholder="${placeholder}"
-      value="${esc(selectedEjercicio)}"
-      onfocus="updateRegistroEjercicioOptions('')"
-      oninput="selectEjercicio(this.value, true); updateRegistroEjercicioOptions(this.value)"
-      autocomplete="off"
-    />
-    <datalist id="${listId}">
-      ${ejs.map(e => `<option value="${esc(e)}"></option>`).join('')}
-    </datalist>
-    <div style="font-size:11px;color:var(--muted-2);margin-top:7px;line-height:1.4;">
-      Empieza a escribir para buscar. También puedes escribir uno nuevo si no aparece.
+    <div style="position:relative">
+      <input
+        class="input ej-select-input"
+        id="reg-ejercicio"
+        placeholder="${placeholder}"
+        value="${esc(selectedEjercicio)}"
+        autocomplete="off"
+        style="padding-right:36px"
+        onfocus="openEjercicioDropdown()"
+        onblur="setTimeout(closeEjercicioDropdown, 150)"
+        oninput="onEjercicioInput(this.value)"
+      />
+      <span style="position:absolute;right:14px;top:14px;color:rgba(255,233,237,.45);font-size:12px;pointer-events:none">▾</span>
+      <div id="ejercicio-options-list"
+           style="display:none;position:absolute;top:100%;left:0;right:0;background:#27153D;border:1px solid rgba(255,233,237,.18);border-top:none;border-radius:0 0 13px 13px;z-index:100;max-height:230px;overflow-y:auto;box-shadow:0 8px 24px rgba(12,5,24,.32)"></div>
     </div>
   `;
 }
 
-function updateRegistroEjercicioOptions(query = "") {
-  const list = document.getElementById('ejercicio-options');
-  if (!list || !selectedGrupo) return;
-
-  const ejs = sortAlpha(config.ejercicios[selectedGrupo] || [])
-    .filter(e => startsWithSearch(e, query));
-
-  list.innerHTML = ejs
-    .map(e => `<option value="${esc(e)}"></option>`)
-    .join('');
+function openEjercicioDropdown() {
+  const list = document.getElementById('ejercicio-options-list');
+  const input = document.getElementById('reg-ejercicio');
+  if (!list) return;
+  renderEjercicioDropdownOptions(input?.value || '');
+  list.style.display = 'block';
+  if (input) {
+    input.style.borderBottomLeftRadius = '0';
+    input.style.borderBottomRightRadius = '0';
+    input.style.borderBottomColor = 'transparent';
+  }
 }
 
-function selectEjercicio(e, custom) {
-  selectedEjercicio = e.trim();
+function closeEjercicioDropdown() {
+  const list = document.getElementById('ejercicio-options-list');
+  const input = document.getElementById('reg-ejercicio');
+  if (list) list.style.display = 'none';
+  if (input) {
+    input.style.borderBottomLeftRadius = '';
+    input.style.borderBottomRightRadius = '';
+    input.style.borderBottomColor = '';
+  }
+}
+
+function onEjercicioInput(val) {
+  selectedEjercicio = val.trim();
+  const list = document.getElementById('ejercicio-options-list');
+  renderEjercicioDropdownOptions(val);
+  if (list) list.style.display = 'block';
+  updateSaveBtn();
+}
+
+function renderEjercicioDropdownOptions(query) {
+  const list = document.getElementById('ejercicio-options-list');
+  if (!list || !selectedGrupo) return;
+
+  const q = normalizeSearch(query);
+  const all = sortAlpha(config.ejercicios[selectedGrupo] || []);
+  const ejs = all.filter(e => !q || normalizeSearch(e).includes(q));
+
+  if (!ejs.length) {
+    list.innerHTML = `<div style="padding:12px 13px;font-size:13px;color:rgba(255,233,237,.55)">${query ? 'Sin coincidencias' : 'Sin ejercicios — escribe uno nuevo'}</div>`;
+    return;
+  }
+
+  list.innerHTML = ejs.map(e => {
+    const sel = e === selectedEjercicio;
+    return `<div
+      data-value="${esc(e)}"
+      onmousedown="event.preventDefault()"
+      onclick="selectEjercicioOption(this.dataset.value)"
+      style="padding:12px 13px;font-size:14px;cursor:pointer;color:${sel?'#F6B6B7':'#FFE9ED'};font-weight:${sel?'700':'400'};background:${sel?'rgba(255,233,237,.10)':'transparent'};border-bottom:1px solid rgba(255,233,237,.07)"
+      onmouseover="this.style.background='rgba(255,233,237,.10)'"
+      onmouseout="this.style.background='${sel?'rgba(255,233,237,.10)':'transparent'}'"
+    >${esc(e)}</div>`;
+  }).join('');
+}
+
+function selectEjercicioOption(val) {
+  selectedEjercicio = val;
+  const input = document.getElementById('reg-ejercicio');
+  if (input) input.value = val;
+  closeEjercicioDropdown();
   updateSaveBtn();
 }
 
