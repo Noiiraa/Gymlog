@@ -8,3 +8,4 @@ let historicalImported = false;
 const HISTORIAL_PAGE_SIZE = 25;
 let historialPage = 1;
 let historialPersona = "";
+let historialEjercicioQuery = "";
