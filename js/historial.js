@@ -13,10 +13,32 @@ function renderHistorial() {
       <button class="history-filter-btn ${historialPersona === '' ? 'active' : ''}" onclick='setHistorialPersona("")'>Todas</button>
       ${personasHistorial.map(p => `<button class="history-filter-btn ${historialPersona === p ? 'active' : ''}" onclick='setHistorialPersona(${JSON.stringify(p)})'>${esc(p)}</button>`).join('')}
     </div>
+
+    <div style="height:12px"></div>
+
+    <div class="history-tools-title">Buscar máquina</div>
+    <div style="display:flex;gap:8px;align-items:center;">
+      <input
+        id="historial-ejercicio-search"
+        class="input"
+        type="search"
+        placeholder="Escribe una máquina o ejercicio..."
+        value="${esc(historialEjercicioQuery)}"
+        oninput="setHistorialEjercicioQuery(this.value)"
+      />
+      ${historialEjercicioQuery ? `<button class="pager-btn" onclick="clearHistorialEjercicioQuery()" title="Limpiar búsqueda">×</button>` : ''}
+    </div>
   </div>`;
+
+  const query = historialEjercicioQuery.trim().toLowerCase();
 
   const filtered = sessions
     .filter(s => !historialPersona || s.persona === historialPersona)
+    .filter(s => {
+        if (!query) return true;
+        return String(s.ejercicio || '').toLowerCase().includes(query)
+      }
+    )
     .sort((a, b) => {
       const byFecha = String(b.fecha || '').localeCompare(String(a.fecha || ''));
       if (byFecha !== 0) return byFecha;
@@ -33,8 +55,13 @@ function renderHistorial() {
   const start = (historialPage - 1) * HISTORIAL_PAGE_SIZE;
   const pageItems = filtered.slice(start, start + HISTORIAL_PAGE_SIZE);
 
+  const activeFilters = [
+    historialPersona ? historialPersona : 'Todas las personas',
+    historialEjercicioQuery ? `Máquina: "${historialEjercicioQuery}"` : ''
+  ].filter(Boolean).join(' · ');
+
   const summary = `<div class="history-summary">
-    <span>${historialPersona ? esc(historialPersona) : 'Todas las personas'} · ${esc(filtered.length)} entradas</span>
+    <span>${esc(activeFilters)} · ${esc(filtered.length)} entradas</span>
     <span>${esc(start + 1)}-${esc(start + pageItems.length)} de ${esc(filtered.length)}</span>
   </div>`;
 
@@ -64,6 +91,25 @@ function renderHistorial() {
 
 function setHistorialPersona(persona) {
   historialPersona = persona;
+  historialPage = 1;
+  renderHistorial();
+}
+
+function setHistorialEjercicioQuery(value) {
+  historialEjercicioQuery = value;
+  historialPage = 1;
+  renderHistorial();
+
+  const input = document.getElementById('historial-ejercicio-search');
+  if (input) {
+    input.focus();
+    const len = input.value.length;
+    input.setSelectionRange(len, len);
+  }
+}
+
+function clearHistorialEjercicioQuery() {
+  historialEjercicioQuery = "";
   historialPage = 1;
   renderHistorial();
 }
