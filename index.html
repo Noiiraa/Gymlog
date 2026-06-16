@@ -117,7 +117,15 @@
       <div class="card-title" id="chart-title">Evolución de peso por máquina</div>
       <div class="btn-row" id="chart-persona-btns" style="margin-bottom:10px;"></div>
       <div class="btn-row" id="chart-mode-btns" style="margin-bottom:10px;"></div>
-      <select id="chart-target" class="input" style="margin-bottom:12px;" onchange="renderChart()"></select>
+      <input
+        id="chart-target"
+        class="input"
+        list="chart-target-options"
+        placeholder="Escribe máquina o grupo..."
+        style="margin-bottom:12px;"
+        oninput="renderChart()"
+      />
+      <datalist id="chart-target-options"></datalist>
       <div class="chart-date-filters">
         <div>
           <label class="label">Desde</label>
@@ -202,7 +210,7 @@
       </div>
       <div>
         <label class="label">Grupo</label>
-        <select id="edit-grupo" class="input" onchange="renderEditEjercicioOptions()"></select>
+       <select id="edit-grupo" class="input" onchange="onEditGrupoChange()"></select>
       </div>
       <div>
         <label class="label">Fase</label>
@@ -216,7 +224,14 @@
       </div>
       <div class="full">
         <label class="label">Ejercicio</label>
-        <input id="edit-ejercicio" class="input" list="edit-ejercicios-list" placeholder="Nombre del ejercicio"/>
+       <input
+          id="edit-ejercicio"
+          class="input"
+          list="edit-ejercicios-list"
+          placeholder="Busca o escribe un ejercicio..."
+          onfocus="renderEditEjercicioOptions('')"
+          oninput="renderEditEjercicioOptions(this.value)"
+        />
         <datalist id="edit-ejercicios-list"></datalist>
       </div>
       <div>

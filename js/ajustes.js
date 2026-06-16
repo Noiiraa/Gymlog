@@ -40,10 +40,11 @@ function addGrupo() {
 
 function renderSelGrupoEj() {
   const sel=document.getElementById('sel-grupo-ej'), cur=sel.value;
-  sel.innerHTML=Object.keys(config.ejercicios).map(g=>`<option value="${esc(g)}"${g===cur?' selected':''}>${esc(g)}</option>`).join('');
+  sel.innerHTML=sortAlpha(Object.keys(config.ejercicios)).map(g=>`<option value="${esc(g)}"${g===cur?' selected':''}>${esc(g)}</option>`).join('');
 }
 function renderEjerciciosAdmin() {
-  const g=document.getElementById('sel-grupo-ej').value, list=config.ejercicios[g]||[];
+  const g = document.getElementById('sel-grupo-ej').value;
+  const list = sortAlpha(config.ejercicios[g] || []);
   document.getElementById('ejercicios-admin-chips').innerHTML = list.map(e=>
     `<span class="chip"><span style="color:rgba(255,233,237,.72)">${esc(e)}</span>
      <button class="chip-del" onclick='removeEjercicio(${JSON.stringify(g)}, ${JSON.stringify(e)})'>×</button></span>`

@@ -89,3 +89,27 @@ function setChartDatePreset(mode) {
     renderChart();
   }
 }
+
+function sortAlpha(values) {
+  return [...values]
+    .filter(Boolean)
+    .sort((a, b) => String(a).localeCompare(String(b), 'es', { sensitivity: 'base' }));
+}
+
+function uniqueSorted(values) {
+  return sortAlpha([...new Set(values.filter(Boolean))]);
+}
+
+function normalizeSearch(value) {
+  return String(value ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toLowerCase();
+}
+
+function startsWithSearch(value, query) {
+  const q = normalizeSearch(query);
+  if (!q) return true;
+  return normalizeSearch(value).startsWith(q);
+}

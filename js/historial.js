@@ -18,27 +18,31 @@ function renderHistorial() {
 
     <div class="history-tools-title">Buscar máquina</div>
     <div style="display:flex;gap:8px;align-items:center;">
-      <input
+     <input
         id="historial-ejercicio-search"
         class="input"
         type="search"
-        placeholder="Escribe una máquina o ejercicio..."
+        placeholder="Escribe una máquina, ejercicio o grupo..."
         value="${esc(historialEjercicioQuery)}"
         oninput="setHistorialEjercicioQuery(this.value)"
+        autocomplete="off"
       />
       ${historialEjercicioQuery ? `<button class="pager-btn" onclick="clearHistorialEjercicioQuery()" title="Limpiar búsqueda">×</button>` : ''}
     </div>
   </div>`;
 
-  const query = historialEjercicioQuery.trim().toLowerCase();
+  const query = normalizeSearch(historialEjercicioQuery);
 
   const filtered = sessions
     .filter(s => !historialPersona || s.persona === historialPersona)
     .filter(s => {
-        if (!query) return true;
-        return String(s.ejercicio || '').toLowerCase().includes(query)
-      }
-    )
+      if (!query) return true;
+
+      const ejercicio = normalizeSearch(s.ejercicio || '');
+      const grupo = normalizeSearch(s.grupo || '');
+
+      return ejercicio.includes(query) || grupo.includes(query);
+    })
     .sort((a, b) => {
       const byFecha = String(b.fecha || '').localeCompare(String(a.fecha || ''));
       if (byFecha !== 0) return byFecha;
@@ -46,7 +50,7 @@ function renderHistorial() {
     });
 
   if (!filtered.length) {
-    el.innerHTML = filters + '<div class="no-data">Sin entradas para este filtro</div>';
+    el.innerHTML = filters + '<div class="no-data">Sin entradas para esta búsqueda</div>';
     return;
   }
 
@@ -100,12 +104,14 @@ function setHistorialEjercicioQuery(value) {
   historialPage = 1;
   renderHistorial();
 
-  const input = document.getElementById('historial-ejercicio-search');
-  if (input) {
-    input.focus();
-    const len = input.value.length;
-    input.setSelectionRange(len, len);
-  }
+  setTimeout(() => {
+    const input = document.getElementById('historial-ejercicio-search');
+    if (input) {
+      input.focus();
+      const len = input.value.length;
+      input.setSelectionRange(len, len);
+    }
+  }, 0);
 }
 
 function clearHistorialEjercicioQuery() {
@@ -129,12 +135,27 @@ function fillSelectOptions(selectId, values, selectedValue) {
   }
 }
 
-function renderEditEjercicioOptions() {
-  const grupo = document.getElementById('edit-grupo').value;
-  const ejs = config.ejercicios?.[grupo] || [];
-  document.getElementById('edit-ejercicios-list').innerHTML = ejs
+function renderEditEjercicioOptions(query = null) {
+  const grupo = document.getElementById('edit-grupo')?.value || '';
+  const input = document.getElementById('edit-ejercicio');
+  const list = document.getElementById('edit-ejercicios-list');
+
+  if (!list) return;
+
+  const search = query === null ? '' : query;
+
+  const ejs = sortAlpha(config.ejercicios?.[grupo] || [])
+    .filter(e => startsWithSearch(e, search));
+
+  list.innerHTML = ejs
     .map(e => `<option value="${esc(e)}"></option>`)
     .join('');
+}
+
+function onEditGrupoChange() {
+  const input = document.getElementById('edit-ejercicio');
+  if (input) input.value = '';
+  renderEditEjercicioOptions('');
 }
 
 function openEditEntry(id) {
@@ -162,7 +183,7 @@ function openEditEntry(id) {
   document.getElementById('edit-reps').value = entry.reps || '';
   document.getElementById('edit-peso').value = entry.peso ?? '';
   document.getElementById('edit-fase').value = entry.fase_menstrual || '';
-  renderEditEjercicioOptions();
+  renderEditEjercicioOptions('');
 
   document.getElementById('edit-modal').style.display = 'flex';
 }
